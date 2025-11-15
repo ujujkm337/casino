@@ -11,8 +11,11 @@ const server = http.createServer(app);
 const io = new Server(server);
 const port = process.env.PORT || 3000;
 
-// Обслуживаем статические файлы из папки 'public'
-app.use(express.static(path.join(__dirname, 'public')));
+// ******************************************************
+// *** ИСПРАВЛЕНИЕ ДЛЯ RENDER:
+// *** Обслуживаем статические файлы из КОРНЕВОЙ директории (так как нет папки public)
+// ******************************************************
+app.use(express.static(__dirname));
 
 // Инициализация серверной логики игры
 const gameServer = new GameServerLogic(io);
@@ -28,6 +31,7 @@ io.on('connection', (socket) => {
 
     // Действия игрока
     socket.on('join_table', (data) => {
+        // Добавлен wantsBots для Блэкджека
         gameServer.joinTable(socket, data.tableId, data.gameType, data.wantsBots);
     });
     

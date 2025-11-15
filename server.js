@@ -1,4 +1,4 @@
-// server.js
+// server.js (Полный код с изменениями)
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
@@ -44,14 +44,21 @@ io.on('connection', (socket) => {
         gameServer.createTable(socket, data);
     });
     
-    // NEW: Запуск игры (для создателя)
+    // OLD: Запуск игры (удален, заменен на start_game_command)
+    /*
     socket.on('start_game', (data) => {
         gameServer.startGame(socket, data.tableId);
     });
+    */
 
     // Блэкджек действия
     socket.on('place_bet', (data) => {
         gameServer.placeBet(socket, data.tableId, data.amount);
+    });
+    
+    // НОВОЕ: Обработчик для явного запуска игры
+    socket.on('start_game_command', (data) => {
+        gameServer.startGameCommand(socket, data.tableId);
     });
 
     socket.on('hit', (data) => {

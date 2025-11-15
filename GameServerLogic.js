@@ -1,4 +1,4 @@
-// GameServerLogic.js (ПОЛНЫЙ ИСПРАВЛЕННЫЙ КОД)
+// GameServerLogic.js (Полный код с изменениями)
 
 const { v4: uuidv4 } = require('uuid'); // Добавьте, если используете uuid
 
@@ -144,12 +144,13 @@ class GameServerLogic {
         }
 
         // 1. Обновление состояния сервера
-        table.players.push({ id: player.id, username: player.username, bet: 0, hand: [], active: false });
+        // Установка активным - всегда при присоединении, для возможности делать ставку
+        table.players.push({ id: player.id, username: player.username, bet: 0, hand: [], active: true }); 
         player.currentTableId = tableId;
         table.currentPlayers = table.players.length;
 
         // 2. Установка статуса стола
-        if (table.gameType === 'Blackjack' && table.state === 'WAITING_FOR_PLAYERS') {
+        if (table.gameType === 'Blackjack' && (table.state === 'WAITING_FOR_PLAYERS' || table.state === 'RESULTS')) {
              table.state = 'WAITING_FOR_BETS';
         }
         
@@ -162,12 +163,22 @@ class GameServerLogic {
         this.broadcastTableList();
     }
 
+    /**
+     * ИСПРАВЛЕНИЕ: Добавление сброса ставки игрока при выходе, чтобы ставка не "зависала".
+     */
     leaveTable(socket) {
         const player = this.players[socket.id];
         if (!player || !player.currentTableId) return;
 
         const tableId = player.currentTableId;
         const table = this.tables[tableId];
+        
+        // Находим игрока, чтобы вернуть ему ставку, если она была
+        const exitingPlayer = table.players.find(p => p.id === player.id);
+        if (exitingPlayer && exitingPlayer.bet > 0) {
+             player.balance += exitingPlayer.bet; // Возврат ставки
+             socket.emit('auth_success', { id: player.id, balance: player.balance }); // Обновление баланса
+        }
         
         // 1. Удаляем игрока из списка стола
         table.players = table.players.filter(p => p.id !== player.id);
@@ -177,7 +188,17 @@ class GameServerLogic {
         socket.leave(tableId);
         player.currentTableId = null;
         
-        // 3. Обновляем состояние
+        // 3. Обновляем состояние стола:
+        if (table.players.length === 0) {
+             table.state = 'WAITING_FOR_PLAYERS';
+        } else if (table.state === 'READY_TO_START') {
+            // Перепроверяем, все ли оставшиеся игроки сделали ставку
+            const allBetsIn = table.players.every(p => p.bet > 0);
+            if (!allBetsIn) {
+                table.state = 'WAITING_FOR_BETS';
+            }
+        }
+        
         this.sendTableState(table); 
 
         // 4. Отправляем команду клиенту И обновленный список столов
@@ -190,10 +211,10 @@ class GameServerLogic {
     sendTableState(table) {
         const tableState = {
             id: table.id,
-            state: table.state, // 'WAITING_FOR_BETS', 'PLAYER_TURN', 'DEALER_TURN', 'RESULTS'
+            state: table.state, // 'WAITING_FOR_BETS', 'READY_TO_START', 'PLAYER_TURN', 'DEALER_TURN', 'RESULTS'
             dealerHand: table.dealerHand,
             dealerScore: calculateScore(table.dealerHand),
-            activePlayerId: table.activePlayerIndex !== undefined && table.activePlayerIndex !== -1 
+            activePlayerId: table.activePlayerIndex !== undefined && table.activePlayerIndex !== -1 && table.players[table.activePlayerIndex]
                                ? table.players[table.activePlayerIndex].id : null,
             players: table.players.map(p => ({
                 id: p.id,
@@ -208,7 +229,7 @@ class GameServerLogic {
     }
     
     /**
-     * ИСПРАВЛЕНИЕ: Добавляем логику перехода в режим раздачи карт после ставок.
+     * ИСПРАВЛЕНИЕ: Отключаем автоматический старт. Переводим в READY_TO_START.
      */
     placeBet(socket, tableId, amount) {
         const player = this.players[socket.id];
@@ -221,6 +242,11 @@ class GameServerLogic {
 
         const tablePlayer = table.players.find(p => p.id === player.id);
         if (tablePlayer) {
+             if (tablePlayer.bet > 0) {
+                 socket.emit('error_message', 'Вы уже сделали ставку в этом раунде.');
+                 return;
+             }
+             
             // 1. Установка ставки
             tablePlayer.bet = amount;
             player.balance -= amount;
@@ -230,14 +256,37 @@ class GameServerLogic {
             const allBetsIn = table.players.every(p => p.bet > 0);
 
             if (allBetsIn && table.players.length > 0) {
-                // 2. Все ставки сделаны: Начинаем игру (КЛЮЧЕВОЙ ТРИГГЕР!)
-                this.startGame(table); 
-            } else {
-                 // 3. Обновляем состояние, даже если игра не началась (чтобы обновить ставки)
-                 this.sendTableState(table);
+                // 2. Все ставки сделаны: Готовимся к старту.
+                table.state = 'READY_TO_START'; 
             }
+            
+             // 3. Обновляем состояние
+             this.sendTableState(table);
         } else {
              socket.emit('error_message', 'Вы не за столом.');
+        }
+    }
+    
+    /**
+     * НОВОЕ: Обработка команды явного запуска игры (кнопка).
+     */
+    startGameCommand(socket, tableId) {
+        const player = this.players[socket.id];
+        const table = this.tables[tableId];
+
+        if (!table || table.gameType !== 'Blackjack') {
+             socket.emit('error_message', 'Стол не найден или не является Блэкджеком.');
+             return;
+        }
+        
+        // Любой игрок может запустить игру, если все готовы
+        if (table.state === 'READY_TO_START') {
+             this.startGame(table);
+             this.sendTableState(table); 
+        } else if (table.state === 'WAITING_FOR_BETS') {
+             socket.emit('error_message', 'Ожидаем ставки от всех игроков.');
+        } else {
+             socket.emit('error_message', 'Игра уже идет.');
         }
     }
     
@@ -252,7 +301,7 @@ class GameServerLogic {
             
             table.players.forEach(p => {
                 p.hand = [];
-                // Если ставка была сделана, игрок активен
+                // Игрок активен, только если сделал ставку
                 p.active = (p.bet > 0); 
             });
 
@@ -273,21 +322,38 @@ class GameServerLogic {
                  table.state = 'WAITING_FOR_BETS';
             }
             
-            this.sendTableState(table); 
+            // NOTE: this.sendTableState(table) вызывается из startGameCommand
         }
     }
     
     // ... (hit, stand, checkResults, dealerPlay, updateBlackjackState - должны быть здесь) ...
-    // ... (логика для Покера должна быть здесь) ...
 
+    // Обработчик отключения (должен быть в коде, чтобы возвращать игрока в лобби)
+    handleDisconnect(socket) {
+        const player = this.players[socket.id];
+        if (player && player.currentTableId) {
+             // Используем leaveTable для корректного выхода и возврата ставки
+             this.leaveTable(socket); 
+        }
+        delete this.players[socket.id];
+        this.broadcastTableList();
+    }
+    
     // --- ПАКЕТНЫЙ ЦИКЛ ОБНОВЛЕНИЯ (GAME LOOP) ---
     startTableLoop() {
         setInterval(() => {
             Object.values(this.tables).forEach(table => {
-                // В этом цикле должна быть логика для продвижения хода ботов и смены состояний.
-                if (table.players.length === 0 && table.id.startsWith('T')) {
-                    // Удалить пустые кастомные столы, чтобы избежать накопления
-                    // delete this.tables[table.id]; 
+                // Логика сброса раунда после результатов
+                if (table.gameType === 'Blackjack' && table.state === 'RESULTS') {
+                    // Переход к новому раунду ставок
+                    table.state = 'WAITING_FOR_BETS';
+                    table.dealerHand = [];
+                    table.players.forEach(p => {
+                        p.bet = 0;
+                        p.hand = [];
+                        p.active = true; // Снова активны для следующей ставки
+                    });
+                    this.sendTableState(table);
                 }
             });
             this.broadcastTableList(); // Регулярное обновление списка столов

@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Казино: Блэкджек</title>
+    <style>
+        /*
+        ================================
+        ОБЩИЕ CSS СТИЛИ (для мобильных)
+        ================================
+        */
+        :root {
+            --bg-color: #03040a;
+            --accent-color: #00ffaa;
+            --secondary-color: #9b56ff;
+            --text-color: #e6f7ff;
+            --red-color: #ff4757;
+            --black-color: #1e272e;
+            --main-font: 'Inter', sans-serif;
+            --card-color: #f0f0f0;
+            --card-suit-red: #ff4757;
+            --card-suit-black: #1e272e;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: var(--main-font);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            overflow-x: hidden;
+        }
+        
+        body.win-flash { animation: win-pulse 0.2s 5 alternate; background-color: #1a222c; }
+        @keyframes win-pulse {
+            from { box-shadow: 0 0 10px var(--accent-color); }
+            to { box-shadow: 0 0 60px var(--accent-color); }
+        }
+
+        .casino-wrapper {
+            width: 95%;
+            max-width: 600px;
+            padding: 10px 0;
+            box-sizing: border-box;
+        }
+
+        .game-container {
+            padding: 15px;
+            border-radius: 15px;
+            background: rgba(1, 1, 1, 0.4);
+            box-shadow: 0 0 30px rgba(0, 0, 0, 0.5), 0 0 30px var(--secondary-color);
+            border: 2px solid var(--secondary-color);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .header-controls {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            width: 100%;
+            justify-content: space-around;
+        }
+        .display { font-size: 1.1em; font-weight: 700; color: var(--text-color); padding: 5px 15px; border-radius: 5px; border: 1px dashed rgba(255, 255, 255, 0.2); }
+        .bet-input-group { display: flex; align-items: center; gap: 5px; }
+        .bet-input-group input { width: 70px; padding: 5px; border-radius: 5px; border: 1px solid var(--accent-color); background-color: var(--bg-color); color: var(--text-color); text-align: center; }
+
+        .main-button { padding: 15px 30px; font-size: 1.5em; font-weight: 800; border: none; border-radius: 10px; cursor: pointer; background: linear-gradient(90deg, var(--secondary-color), var(--accent-color)); color: var(--bg-color); box-shadow: 0 5px 20px rgba(0, 255, 170, 0.4); transition: all 0.2s ease; text-transform: uppercase; }
+        .main-button:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 7px 25px rgba(0, 255, 170, 0.8); }
+        .main-button:disabled { background: #555; box-shadow: none; cursor: not-allowed; opacity: 0.6; }
+
+
+        /* ----- Блэкджек Стили ----- */
+        .hand-display { text-align: left; width: 100%; max-width: 400px; margin-bottom: 10px; }
+        .hand-display p { font-size: 1em; font-weight: bold; margin: 8px 0; }
+        .card { 
+            display: inline-block; 
+            width: 35px; 
+            height: 50px; 
+            line-height: 50px;
+            font-size: 0.9em;
+            background-color: var(--card-color); 
+            border: 1px solid #777; 
+            border-radius: 4px; 
+            box-shadow: 1px 1px 3px rgba(0, 0, 0, 0.5); 
+            margin: 0 2px; 
+            text-align: center;
+            font-weight: 700;
+            color: var(--card-suit-black);
+        }
+        .card.red { color: var(--card-suit-red); }
+        .card.hidden { background-color: #555; color: transparent; border: 1px solid #ccc; }
+        .blackjack-controls { 
+            display: flex; 
+            gap: 10px; 
+            margin-top: 10px; 
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+    </style>
+</head>
+<body>
+
+<div class="casino-wrapper" id="casinoWrapper">
+    <div class="game-container">
+        <a href="index.html" style="color: var(--secondary-color); text-decoration: none; align-self: flex-start;">&larr; Назад в меню</a>
+        
+        <h1>2️⃣1️⃣ Блэкджек</h1>
+        
+        <div class="header-controls">
+            <div class="display" id="balanceDisplay">Баланс: 500</div>
+            <div class="bet-input-group">
+                <span>Ставка:</span>
+                <input type="number" id="betAmount" value="10" min="10" max="1000">
+            </div>
+        </div>
+
+        <div class="game-view active" id="blackjackView">
+            <div class="hand-display">
+                <p>Дилер: <span id="dealerHand">? | ?</span> (Счет: <span id="dealerScore">?</span>)</p>
+                <p>Игрок: <span id="playerHand">? | ?</span> (Счет: <span id="playerScore">?</span>)</p>
+            </div>
+            <div class="blackjack-controls">
+                <button class="main-button" id="blackjackDealButton" onclick="startBlackjackGame()">Начать игру</button>
+                <button class="main-button" id="blackjackHitButton" onclick="playerHit()" disabled>Взять (Hit)</button>
+                <button class="main-button" id="blackjackStandButton" onclick="playerStand()" disabled>Хватит (Stand)</button>
+            </div>
+        </div>
+
+        <div class="display" id="message">Нажмите "Начать игру!"</div>
+    </div>
+</div>
+
+<audio id="audioClick" src="https://www.soundjay.com/buttons/button-2.mp3" preload="auto"></audio>
+<audio id="audioSpin" src="https://www.soundjay.com/misc/spinning-2.mp3" preload="auto"></audio>
+<audio id="audioWin" src="https://www.soundjay.com/misc/success-trumpet.mp3" preload="auto"></audio>
+<audio id="audioLose" src="https://www.soundjay.com/misc/fail-buzzer-01.mp3" preload="auto"></audio>
+
+<script>
+    /*
+    ================================
+    JAVASCRIPT ЛОГИКА БЛЭКДЖЕК
+    ================================
+    */
+    
+    // ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ
+    let balance = 500;
+    let isBlackjackActive = false;
+    let deck = [];
+    let playerHand = [];
+    let dealerHand = [];
+    
+    // ------------------------------------
+    // ОБЩИЕ ФУНКЦИИ
+    // ------------------------------------
+    
+    function playSound(name) {
+        const audio = document.getElementById(`audio${name.charAt(0).toUpperCase() + name.slice(1)}`);
+        if (audio) {
+            audio.currentTime = 0;
+            audio.play().catch(e => console.log("Audio playback failed:", e));
+        }
+    }
+
+    function getCurrentBet() {
+        const betInput = document.getElementById('betAmount');
+        let bet = parseInt(betInput.value) || 10;
+        bet = Math.min(Math.max(10, bet), balance || 10);
+        betInput.value = bet;
+        return bet;
+    }
+
+    function updateDisplay(msg = '') {
+        document.body.classList.remove('win-flash');
+        document.getElementById('balanceDisplay').textContent = `Баланс: ${balance} кредитов`;
+        if (msg) document.getElementById('message').textContent = msg;
+        
+        const currentBet = getCurrentBet();
+        const isBusy = isBlackjackActive;
+
+        document.getElementById('blackjackDealButton').disabled = isBusy || balance < currentBet;
+        document.getElementById('blackjackHitButton').disabled = !isBusy;
+        document.getElementById('blackjackStandButton').disabled = !isBusy;
+        
+        if (balance < 10 && !isBusy) {
+            updateDisplay('💔 Недостаточно кредитов! Игра окончена.');
+        }
+    }
+
+    function triggerWinEffect() {
+        document.body.classList.add('win-flash');
+        playSound('win');
+        setTimeout(() => document.body.classList.remove('win-flash'), 1200);
+    }
+
+    // ------------------------------------
+    // ЛОГИКА БЛЭКДЖЕКА
+    // ------------------------------------
+
+    function createDeck() {
+        const suits = ['♠️', '♥️', '♦️', '♣️'];
+        const ranks = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
+        const newDeck = [];
+        
+        for (const suit of suits) {
+            for (const rank of ranks) {
+                let value = parseInt(rank);
+                if (isNaN(value)) {
+                    value = (rank === 'A') ? 11 : 10;
+                }
+                newDeck.push({ rank, suit, value, color: (suit === '♥️' || suit === '♦️') ? 'red' : 'black' });
+            }
+        }
+        return newDeck.sort(() => Math.random() - 0.5); 
+    }
+
+    function getCard() {
+        if (deck.length === 0) deck = createDeck();
+        return deck.pop();
+    }
+
+    function calculateScore(hand) {
+        let score = hand.reduce((sum, card) => sum + card.value, 0);
+        let aces = hand.filter(card => card.rank === 'A').length;
+
+        while (score > 21 && aces > 0) {
+            score -= 10;
+            aces--;
+        }
+        return score;
+    }
+    
+    function renderHand(hand, elementId, hideFirst = false) {
+        const element = document.getElementById(elementId);
+        element.innerHTML = '';
+        
+        hand.forEach((card, index) => {
+            const cardDiv = document.createElement('span');
+            cardDiv.className = `card ${card.color}`;
+            cardDiv.textContent = card.rank + card.suit;
+            
+            if (hideFirst && index === 0) {
+                cardDiv.className += ' hidden';
+                cardDiv.textContent = '??';
+            }
+            element.appendChild(cardDiv);
+        });
+        
+        const scoreElement = document.getElementById(elementId.replace('Hand', 'Score'));
+        if (scoreElement) {
+            scoreElement.textContent = hideFirst ? '?' : calculateScore(hand);
+        }
+    }
+    
+    function resetBlackjack() {
+        isBlackjackActive = false;
+        playerHand = [];
+        dealerHand = [];
+        document.getElementById('playerHand').innerHTML = '? | ?'; 
+        document.getElementById('dealerHand').innerHTML = '? | ?';
+        document.getElementById('playerScore').textContent = '?';
+        document.getElementById('dealerScore').textContent = '?';
+        updateDisplay('Нажмите "Начать игру", чтобы сделать ставку.');
+    }
+
+    function startBlackjackGame() {
+        const bet = getCurrentBet();
+        if (isBlackjackActive || balance < bet) return;
+        
+        resetBlackjack(); 
+        isBlackjackActive = true;
+        balance -= bet;
+        deck = createDeck();
+        
+        playerHand.push(getCard(), getCard());
+        dealerHand.push(getCard(), getCard());
+
+        renderHand(playerHand, 'playerHand');
+        renderHand(dealerHand, 'dealerHand', true);
+
+        const playerScore = calculateScore(playerHand);
+        
+        updateDisplay(`БЛЭКДЖЕК: Сделана ставка ${bet}. Начинайте игру!`);
+        
+        if (playerScore === 21) {
+            updateDisplay('БЛЭКДЖЕК: Натуральный Блэкджек! Ждем дилера...');
+            setTimeout(() => playerStand(), 1500); 
+            return;
+        }
+        updateDisplay(); // Обновить кнопки
+    }
+    
+    function playerHit() {
+        if (!isBlackjackActive) return;
+        playerHand.push(getCard());
+        renderHand(playerHand, 'playerHand');
+        
+        const playerScore = calculateScore(playerHand);
+        updateDisplay(`БЛЭКДЖЕК: Вы взяли карту. Счет: ${playerScore}`);
+        
+        if (playerScore > 21) {
+            updateDisplay(`❌ БЛЭКДЖЕК: Перебор (Bust)! Ваш счет ${playerScore}. Проигрыш ${getCurrentBet()} кредитов.`);
+            playSound('lose');
+            isBlackjackActive = false;
+            updateDisplay();
+            setTimeout(resetBlackjack, 3000);
+        } else if (playerScore === 21) {
+            playerStand();
+        }
+    }
+    
+    function playerStand() {
+        if (!isBlackjackActive) return;
+        
+        document.getElementById('blackjackHitButton').disabled = true;
+        document.getElementById('blackjackStandButton').disabled = true;
+
+        dealerPlay();
+    }
+
+    function dealerPlay() {
+        renderHand(dealerHand, 'dealerHand', false); 
+        updateDisplay('БЛЭКДЖЕК: Ход Дилера...');
+
+        const dealerTurn = setInterval(() => {
+            let dealerScore = calculateScore(dealerHand);
+            const playerScore = calculateScore(playerHand);
+            
+            if (dealerScore < 17 && playerScore <= 21) {
+                dealerHand.push(getCard());
+                renderHand(dealerHand, 'dealerHand', false);
+                dealerScore = calculateScore(dealerHand);
+            } else {
+                clearInterval(dealerTurn);
+                checkBlackjackResult(playerScore, dealerScore);
+            }
+        }, 1000);
+    }
+    
+    function checkBlackjackResult(playerScore, dealerScore) {
+        const bet = getCurrentBet();
+        let winAmount = 0;
+        let msg = `БЛЭКДЖЕК: Финальный счет: Игрок ${playerScore}, Дилер ${dealerScore}. `;
+
+        if (playerScore > 21) {
+            msg = `❌ БЛЭКДЖЕК: Перебор (Bust)! Проигрыш.`;
+            playSound('lose');
+        } else if (dealerScore > 21) {
+            winAmount = bet * 2; 
+            balance += winAmount;
+            msg += `🎉 Дилер перебрал! ВЫИГРЫШ! +${bet} кредитов!`;
+            triggerWinEffect();
+        } else if (playerScore === dealerScore) {
+            winAmount = bet; 
+            balance += winAmount;
+            msg += `Ничья (Push)! Ставка возвращена.`;
+            playSound('click');
+        } else if (playerScore > dealerScore) {
+            winAmount = bet * 2; 
+            balance += winAmount;
+            msg += `🎉 Вы победили! ВЫИГРЫШ! +${bet} кредитов!`;
+            triggerWinEffect();
+        } else {
+            msg += `🙁 Дилер победил. Проигрыш.`;
+            playSound('lose');
+        }
+        
+        isBlackjackActive = false;
+        updateDisplay(msg);
+        setTimeout(resetBlackjack, 3000);
+    }
+
+
+    // Инициализация
+    window.onload = () => {
+        resetBlackjack();
+    };
+</script>
+</body>
+</html>

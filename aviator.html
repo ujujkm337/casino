@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Казино: Авиатор (Crash)</title>
+    <style>
+        /* CSS СТИЛИ - Общие и для Авиатора */
+        :root {
+            --bg-color: #03040a;
+            --accent-color: #00ffaa;
+            --secondary-color: #9b56ff;
+            --text-color: #e6f7ff;
+            --red-color: #ff4757;
+            --black-color: #1e272e;
+            --main-font: 'Inter', sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: var(--main-font);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            overflow-x: hidden;
+        }
+        
+        body.win-flash { animation: win-pulse 0.2s 5 alternate; background-color: #1a222c; }
+        @keyframes win-pulse {
+            from { box-shadow: 0 0 10px var(--accent-color); }
+            to { box-shadow: 0 0 60px var(--accent-color); }
+        }
+
+        .casino-wrapper {
+            width: 95%;
+            max-width: 600px;
+            padding: 10px 0;
+            box-sizing: border-box;
+        }
+
+        .game-container {
+            padding: 15px;
+            border-radius: 15px;
+            background: rgba(1, 1, 1, 0.4);
+            box-shadow: 0 0 30px rgba(0, 0, 0, 0.5), 0 0 30px var(--secondary-color);
+            border: 2px solid var(--secondary-color);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .header-controls {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            width: 100%;
+            justify-content: space-around;
+        }
+        .display { font-size: 1.1em; font-weight: 700; color: var(--text-color); padding: 5px 15px; border-radius: 5px; border: 1px dashed rgba(255, 255, 255, 0.2); }
+        .bet-input-group { display: flex; align-items: center; gap: 5px; }
+        .bet-input-group input { width: 70px; padding: 5px; border-radius: 5px; border: 1px solid var(--accent-color); background-color: var(--bg-color); color: var(--text-color); text-align: center; }
+
+        .main-button { padding: 10px 20px; font-size: 1.2em; font-weight: 800; border: none; border-radius: 8px; cursor: pointer; background: linear-gradient(90deg, var(--secondary-color), var(--accent-color)); color: var(--bg-color); box-shadow: 0 5px 20px rgba(0, 255, 170, 0.4); transition: all 0.2s ease; text-transform: uppercase; }
+        .main-button:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 7px 25px rgba(0, 255, 170, 0.8); }
+        .main-button:disabled { background: #555; box-shadow: none; cursor: not-allowed; opacity: 0.6; }
+        
+        /* Специфические стили для Авиатора */
+        .crash-game-area {
+            position: relative;
+            width: 100%;
+            max-width: 300px;
+            height: 150px;
+            background: rgba(0, 0, 0, 0.3);
+            border: 2px solid var(--secondary-color);
+            border-radius: 10px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-end; 
+            margin-bottom: 10px;
+        }
+        .runner-visual {
+            font-size: 100px; /* Увеличен */
+            transition: transform 0.1s;
+            position: absolute;
+            bottom: 0;
+        }
+        .multiplier-display {
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            font-size: 1.8em;
+            font-weight: bold;
+            color: var(--accent-color);
+        }
+        .crash-controls {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            width: 100%;
+        }
+    </style>
+</head>
+<body>
+
+<div class="casino-wrapper" id="casinoWrapper">
+    <div class="game-container">
+        <a href="index.html" style="color: var(--secondary-color); text-decoration: none; align-self: flex-start;">&larr; Назад в меню</a>
+        
+        <h1>✈️ Авиатор (Crash)</h1>
+        
+        <div class="header-controls">
+            <div class="display" id="balanceDisplay">Баланс: 500</div>
+            <div class="bet-input-group">
+                <span>Ставка:</span>
+                <input type="number" id="betAmount" value="10" min="10" max="1000">
+            </div>
+        </div>
+
+        <div class="game-view active" id="aviatorView">
+            <p>Будьте осторожны, самолёт падает очень быстро!</p>
+            <div class="crash-game-area">
+                <div class="runner-visual" id="aviatorVisual">✈️</div>
+                <div class="multiplier-display" id="aviatorMultiplier">1.00x</div>
+            </div>
+            <div class="crash-controls">
+                <button class="main-button" id="aviatorStartButton">Запустить</button>
+                <button class="main-button" id="aviatorCashOutButton" disabled>Забрать</button>
+            </div>
+        </div>
+
+        <div class="display" id="message">Нажмите "Запустить" и заберите ставку до "Краха"!</div>
+    </div>
+</div>
+
+<audio id="audioClick" src="https://www.soundjay.com/buttons/button-2.mp3" preload="auto"></audio>
+<audio id="audioSpin" src="https://www.soundjay.com/misc/spinning-2.mp3" preload="auto"></audio>
+<audio id="audioWin" src="https://www.soundjay.com/misc/success-trumpet.mp3" preload="auto"></audio>
+<audio id="audioLose" src="https://www.soundjay.com/misc/fail-buzzer-01.mp3" preload="auto"></audio>
+
+<script>
+    /*
+    ================================
+    JAVASCRIPT ЛОГИКА ИГРЫ
+    ================================
+    */
+    
+    // ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ
+    let balance = 500;
+    let isCrashGameActive = false; 
+    let currentMultiplier = 1.00;
+    let crashPoint = 0;
+    let crashGameLoop;
+    const TICK_RATE = 100;
+
+    // ------------------------------------
+    // ОБЩИЕ ФУНКЦИИ
+    // ------------------------------------
+
+    function playSound(name) {
+        const audio = document.getElementById(`audio${name.charAt(0).toUpperCase() + name.slice(1)}`);
+        if (audio) {
+            audio.currentTime = 0;
+            audio.play().catch(e => console.log("Audio playback failed:", e));
+        }
+    }
+
+    function getCurrentBet() {
+        const betInput = document.getElementById('betAmount');
+        let bet = parseInt(betInput.value) || 10;
+        bet = Math.min(Math.max(10, bet), balance || 10);
+        betInput.value = bet;
+        return bet;
+    }
+
+    function updateDisplay(msg = '') {
+        document.body.classList.remove('win-flash');
+        document.getElementById('balanceDisplay').textContent = `Баланс: ${balance} кредитов`;
+        if (msg) document.getElementById('message').textContent = msg;
+        
+        const currentBet = getCurrentBet();
+        const isBusy = isCrashGameActive; 
+
+        document.getElementById('aviatorStartButton').disabled = isBusy || balance < currentBet;
+        document.getElementById('aviatorCashOutButton').disabled = !isBusy;
+        
+        if (balance < 10 && !isBusy) {
+            updateDisplay('💔 Недостаточно кредитов! Игра окончена.');
+        }
+    }
+
+    function triggerWinEffect() {
+        document.body.classList.add('win-flash');
+        playSound('win');
+        setTimeout(() => document.body.classList.remove('win-flash'), 1200);
+    }
+    
+    // ------------------------------------
+    // ЛОГИКА CRASH-ИГР (Авиатор) 
+    // ------------------------------------
+
+    function startCrashGame(gameId = 'aviator') {
+        const bet = getCurrentBet();
+        if (isCrashGameActive || balance < bet) return;
+
+        isCrashGameActive = true;
+        balance -= bet;
+        currentMultiplier = 1.00;
+        playSound('spin');
+
+        // Высокий шанс на быстрый краш для "опасного" казино
+        crashPoint = 1.01 + Math.pow(Math.random(), 3) * 3.0; 
+        
+        updateDisplay(`АВИАТОР: Игра началась. Делайте кэшаут!`);
+        document.getElementById(`${gameId}StartButton`).disabled = true;
+        
+        document.getElementById(`${gameId}Multiplier`).textContent = `${currentMultiplier.toFixed(2)}x`;
+        document.getElementById(`${gameId}Visual`).style.transform = 'translateY(0)';
+
+
+        crashGameLoop = setInterval(() => {
+            if (!isCrashGameActive) {
+                clearInterval(crashGameLoop);
+                return;
+            }
+
+            // Ускорение роста множителя
+            currentMultiplier += 0.01 + (currentMultiplier < 2 ? 0.01 : 0.005); 
+            
+            const visualElement = document.getElementById(`${gameId}Visual`);
+            // Увеличиваем смещение для большего самолета
+            const offset = -Math.min(currentMultiplier * 10, 80); 
+            visualElement.style.transform = `translateY(${offset}px)`;
+
+            if (currentMultiplier >= crashPoint) {
+                endCrashGame(gameId, 'crash');
+                return;
+            }
+
+            document.getElementById(`${gameId}Multiplier`).textContent = `${currentMultiplier.toFixed(2)}x`;
+            document.getElementById(`${gameId}CashOutButton`).textContent = `Забрать (${(bet * currentMultiplier).toFixed(0)})`;
+            document.getElementById(`${gameId}CashOutButton`).disabled = false;
+
+        }, TICK_RATE);
+    }
+
+    function endCrashGame(gameId = 'aviator', result) {
+        if (!isCrashGameActive) return;
+
+        clearInterval(crashGameLoop);
+        isCrashGameActive = false;
+        const bet = getCurrentBet();
+        
+        document.getElementById(`${gameId}CashOutButton`).textContent = 'Забрать';
+        document.getElementById(`${gameId}Visual`).style.transform = 'translateY(0)';
+        
+        if (result === 'crash') {
+            document.getElementById(`${gameId}Visual`).textContent = '💥';
+            document.getElementById(`${gameId}Multiplier`).textContent = `${currentMultiplier.toFixed(2)}x (CRASH!)`;
+            playSound('lose');
+            updateDisplay(`❌ АВИАТОР: КРАХ при ${currentMultiplier.toFixed(2)}x. Проигрыш ${bet} кредитов.`);
+        } else {
+            document.getElementById(`${gameId}Visual`).textContent = '🛬';
+            const winAmount = Math.floor(bet * currentMultiplier);
+            balance += winAmount;
+            triggerWinEffect();
+            updateDisplay(`💰 АВИАТОР: ВЫИГРЫШ! Забрали ${winAmount} кредитов при ${currentMultiplier.toFixed(2)}x.`);
+        }
+
+        updateDisplay();
+        setTimeout(() => document.getElementById(`${gameId}Visual`).textContent = '✈️', 1000);
+    }
+
+    document.getElementById('aviatorStartButton').onclick = () => startCrashGame('aviator');
+    document.getElementById('aviatorCashOutButton').onclick = () => endCrashGame('aviator', 'cashout');
+    
+    // Инициализация
+    window.onload = () => {
+        updateDisplay('Нажмите "Запустить" и заберите ставку до "Краха"!');
+    };
+</script>
+</body>
+</html>

@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Казино: Больше/Меньше (Hi-Lo)</title>
+    <style>
+        /* CSS СТИЛИ - Общие и для Hi-Lo */
+        :root {
+            --bg-color: #03040a;
+            --accent-color: #00ffaa;
+            --secondary-color: #9b56ff;
+            --text-color: #e6f7ff;
+            --red-color: #ff4757;
+            --black-color: #1e272e;
+            --main-font: 'Inter', sans-serif;
+            --card-color: #f0f0f0;
+            --card-suit-red: #ff4757;
+            --card-suit-black: #1e272e;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: var(--main-font);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            overflow-x: hidden;
+        }
+        
+        body.win-flash { animation: win-pulse 0.2s 5 alternate; background-color: #1a222c; }
+        @keyframes win-pulse {
+            from { box-shadow: 0 0 10px var(--accent-color); }
+            to { box-shadow: 0 0 60px var(--accent-color); }
+        }
+
+        .casino-wrapper {
+            width: 95%;
+            max-width: 600px;
+            padding: 10px 0;
+            box-sizing: border-box;
+        }
+
+        .game-container {
+            padding: 15px;
+            border-radius: 15px;
+            background: rgba(1, 1, 1, 0.4);
+            box-shadow: 0 0 30px rgba(0, 0, 0, 0.5), 0 0 30px var(--secondary-color);
+            border: 2px solid var(--secondary-color);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .header-controls {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            width: 100%;
+            justify-content: space-around;
+        }
+        .display { font-size: 1.1em; font-weight: 700; color: var(--text-color); padding: 5px 15px; border-radius: 5px; border: 1px dashed rgba(255, 255, 255, 0.2); }
+        .bet-input-group { display: flex; align-items: center; gap: 5px; }
+        .bet-input-group input { width: 70px; padding: 5px; border-radius: 5px; border: 1px solid var(--accent-color); background-color: var(--bg-color); color: var(--text-color); text-align: center; }
+
+        .main-button { padding: 10px 20px; font-size: 1.2em; font-weight: 800; border: none; border-radius: 8px; cursor: pointer; background: linear-gradient(90deg, var(--secondary-color), var(--accent-color)); color: var(--bg-color); box-shadow: 0 5px 20px rgba(0, 255, 170, 0.4); transition: all 0.2s ease; text-transform: uppercase; }
+        .main-button:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 7px 25px rgba(0, 255, 170, 0.8); }
+        .main-button:disabled { background: #555; box-shadow: none; cursor: not-allowed; opacity: 0.6; }
+        
+        /* Специфические стили для Hi-Lo */
+        .hilo-card-container {
+            display: flex;
+            gap: 20px;
+            align-items: center;
+            margin: 15px 0;
+        }
+        .card-visual { 
+            width: 70px;
+            height: 90px;
+            line-height: 90px;
+            font-size: 1.5em;
+            background-color: var(--card-color); 
+            border: 1px solid #777; 
+            border-radius: 6px; 
+            box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.5); 
+            text-align: center;
+            font-weight: 700;
+            color: var(--card-suit-black);
+            transition: all 0.5s;
+        }
+        .card-visual.red { color: var(--card-suit-red); }
+        .card-visual.back { background-color: var(--secondary-color); color: transparent; }
+
+        .hilo-controls {
+            display: flex;
+            gap: 15px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="casino-wrapper" id="casinoWrapper">
+    <div class="game-container">
+        <a href="index.html" style="color: var(--secondary-color); text-decoration: none; align-self: flex-start;">&larr; Назад в меню</a>
+        
+        <h1>🎚️ Больше/Меньше (Hi-Lo)</h1>
+        
+        <div class="header-controls">
+            <div class="display" id="balanceDisplay">Баланс: 500</div>
+            <div class="bet-input-group">
+                <span>Ставка:</span>
+                <input type="number" id="betAmount" value="10" min="10" max="1000">
+            </div>
+        </div>
+
+        <div class="game-view active" id="hiloView">
+            <p>Угадайте, будет ли следующая карта **больше** или **меньше** текущей. Туз - младший.</p>
+            <div class="hilo-card-container">
+                <div class="card-visual" id="hiloCurrentCard">?</div>
+                <div class="card-visual back" id="hiloNextCard">?</div>
+            </div>
+            <div class="hilo-controls">
+                <button class="main-button" data-hilo="higher" onclick="playHiLoGame('higher')">Больше (⬆️)</button>
+                <button class="main-button" data-hilo="lower" onclick="playHiLoGame('lower')">Меньше (⬇️)</button>
+            </div>
+        </div>
+
+        <div class="display" id="message">Сделайте ставку и начните игру!</div>
+    </div>
+</div>
+
+<audio id="audioClick" src="https://www.soundjay.com/buttons/button-2.mp3" preload="auto"></audio>
+<audio id="audioSpin" src="https://www.soundjay.com/misc/spinning-2.mp3" preload="auto"></audio>
+<audio id="audioWin" src="https://www.soundjay.com/misc/success-trumpet.mp3" preload="auto"></audio>
+<audio id="audioLose" src="https://www.soundjay.com/misc/fail-buzzer-01.mp3" preload="auto"></audio>
+
+<script>
+    /*
+    ================================
+    JAVASCRIPT ЛОГИКА ИГРЫ
+    ================================
+    */
+    
+    // ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ
+    let balance = 500;
+    let isSpinning = false; // Блокировка для игры
+    const CARD_RANKS = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
+    let hiloCurrentCard = null;
+
+    // ------------------------------------
+    // ОБЩИЕ ФУНКЦИИ
+    // ------------------------------------
+
+    function playSound(name) {
+        const audio = document.getElementById(`audio${name.charAt(0).toUpperCase() + name.slice(1)}`);
+        if (audio) {
+            audio.currentTime = 0;
+            audio.play().catch(e => console.log("Audio playback failed:", e));
+        }
+    }
+
+    function getCurrentBet() {
+        const betInput = document.getElementById('betAmount');
+        let bet = parseInt(betInput.value) || 10;
+        bet = Math.min(Math.max(10, bet), balance || 10);
+        betInput.value = bet;
+        return bet;
+    }
+
+    function updateDisplay(msg = '') {
+        document.body.classList.remove('win-flash');
+        document.getElementById('balanceDisplay').textContent = `Баланс: ${balance} кредитов`;
+        if (msg) document.getElementById('message').textContent = msg;
+        
+        const currentBet = getCurrentBet();
+        const isBusy = isSpinning;
+
+        document.querySelectorAll('.hilo-controls .main-button').forEach(button => {
+            button.disabled = isBusy || balance < currentBet;
+        });
+        
+        if (balance < 10 && !isBusy) {
+            updateDisplay('💔 Недостаточно кредитов! Игра окончена.');
+        }
+    }
+
+    function triggerWinEffect() {
+        document.body.classList.add('win-flash');
+        playSound('win');
+        setTimeout(() => document.body.classList.remove('win-flash'), 1200);
+    }
+    
+    // ------------------------------------
+    // ЛОГИКА БОЛЬШЕ/МЕНЬШЕ (HI-LO) - КАРТЫ
+    // ------------------------------------
+    
+    function getCardValue(rank) {
+        return CARD_RANKS.indexOf(rank); // A=0, K=12. A - младший
+    }
+    
+    function generateRandomCard() {
+        const suits = ['♠️', '♥️', '♦️', '♣️'];
+        const rank = CARD_RANKS[Math.floor(Math.random() * CARD_RANKS.length)];
+        const suit = suits[Math.floor(Math.random() * suits.length)];
+        const color = (suit === '♥️' || suit === '♦️') ? 'red' : 'black';
+        return { rank, suit, color, value: getCardValue(rank) };
+    }
+
+    function initializeHiLo() {
+        hiloCurrentCard = generateRandomCard();
+        renderCard(hiloCurrentCard, 'hiloCurrentCard');
+        
+        const nextCardVisual = document.getElementById('hiloNextCard');
+        nextCardVisual.textContent = '?';
+        nextCardVisual.className = 'card-visual back';
+        
+        updateDisplay('Сделайте ставку и угадайте, будет ли следующая карта больше или меньше.');
+    }
+    
+    function renderCard(card, elementId) {
+        const element = document.getElementById(elementId);
+        element.textContent = card.rank + card.suit;
+        element.className = `card-visual ${card.color}`;
+    }
+
+    function playHiLoGame(choice) {
+        const bet = getCurrentBet();
+        if (isSpinning || balance < bet) return;
+        
+        isSpinning = true;
+        balance -= bet;
+        updateDisplay(`БОЛЬШЕ/МЕНЬШЕ: Ваше предположение: ${choice === 'higher' ? 'БОЛЬШЕ' : 'МЕНЬШЕ'}`);
+        playSound('click');
+
+        setTimeout(() => {
+            const nextCard = generateRandomCard();
+            renderCard(nextCard, 'hiloNextCard');
+
+            let win = false;
+            let winAmount = 0;
+            let msg = '';
+
+            if (nextCard.value === hiloCurrentCard.value) {
+                // Ничья
+                winAmount = bet; 
+                balance += winAmount;
+                playSound('click');
+                msg = `БОЛЬШЕ/МЕНЬШЕ: Выпала ${nextCard.rank}. Ничья! Ставка возвращена.`;
+            } else if (nextCard.value > hiloCurrentCard.value && choice === 'higher') {
+                win = true;
+            } else if (nextCard.value < hiloCurrentCard.value && choice === 'lower') {
+                win = true;
+            }
+
+            if (win) {
+                winAmount = Math.floor(bet * 2); 
+                balance += winAmount;
+                triggerWinEffect();
+                msg = `🎉 БОЛЬШЕ/МЕНЬШЕ: Выпала ${nextCard.rank}. ВЫИГРЫШ! +${bet} кредитов!`;
+            } else if (!win && winAmount === 0) {
+                playSound('lose');
+                msg = `🙁 БОЛЬШЕ/МЕНЬШЕ: Выпала ${nextCard.rank}. Проигрыш.`;
+            }
+            
+            hiloCurrentCard = nextCard;
+            isSpinning = false;
+            
+            setTimeout(() => {
+                initializeHiLo(); // Сброс и показ следующей карты
+                updateDisplay(msg);
+            }, 1500);
+            
+        }, 1000);
+    }
+    
+    // Инициализация
+    window.onload = () => {
+        initializeHiLo();
+    };
+</script>
+</body>
+</html>

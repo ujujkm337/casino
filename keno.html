@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Казино: Кено</title>
+    <style>
+        /* CSS СТИЛИ - Общие и для Кено */
+        :root {
+            --bg-color: #03040a;
+            --accent-color: #00ffaa;
+            --secondary-color: #9b56ff;
+            --text-color: #e6f7ff;
+            --red-color: #ff4757;
+            --black-color: #1e272e;
+            --main-font: 'Inter', sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: var(--main-font);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            overflow-x: hidden;
+        }
+        
+        body.win-flash { animation: win-pulse 0.2s 5 alternate; background-color: #1a222c; }
+        @keyframes win-pulse {
+            from { box-shadow: 0 0 10px var(--accent-color); }
+            to { box-shadow: 0 0 60px var(--accent-color); }
+        }
+
+        .casino-wrapper {
+            width: 95%;
+            max-width: 600px;
+            padding: 10px 0;
+            box-sizing: border-box;
+        }
+
+        .game-container {
+            padding: 15px;
+            border-radius: 15px;
+            background: rgba(1, 1, 1, 0.4);
+            box-shadow: 0 0 30px rgba(0, 0, 0, 0.5), 0 0 30px var(--secondary-color);
+            border: 2px solid var(--secondary-color);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .header-controls {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            width: 100%;
+            justify-content: space-around;
+        }
+        .display { font-size: 1.1em; font-weight: 700; color: var(--text-color); padding: 5px 15px; border-radius: 5px; border: 1px dashed rgba(255, 255, 255, 0.2); }
+        .bet-input-group { display: flex; align-items: center; gap: 5px; }
+        .bet-input-group input { width: 70px; padding: 5px; border-radius: 5px; border: 1px solid var(--accent-color); background-color: var(--bg-color); color: var(--text-color); text-align: center; }
+
+        .main-button { padding: 10px 20px; font-size: 1.2em; font-weight: 800; border: none; border-radius: 8px; cursor: pointer; background: linear-gradient(90deg, var(--secondary-color), var(--accent-color)); color: var(--bg-color); box-shadow: 0 5px 20px rgba(0, 255, 170, 0.4); transition: all 0.2s ease; text-transform: uppercase; }
+        .main-button:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 7px 25px rgba(0, 255, 170, 0.8); }
+        .main-button:disabled { background: #555; box-shadow: none; cursor: not-allowed; opacity: 0.6; }
+        
+        /* Специфические стили для Кено */
+        .keno-board {
+            display: grid;
+            grid-template-columns: repeat(10, 1fr);
+            gap: 4px;
+            width: 100%;
+            max-width: 450px;
+            padding: 10px;
+            border: 2px solid var(--accent-color);
+            border-radius: 10px;
+            margin-bottom: 15px;
+        }
+        .keno-number {
+            padding: 8px 4px;
+            font-size: 0.9em;
+            font-weight: bold;
+            background: #222;
+            border-radius: 4px;
+            text-align: center;
+            cursor: pointer;
+            transition: background 0.2s;
+            border: 1px solid #444;
+        }
+        .keno-number.selected {
+            background-color: var(--secondary-color);
+            color: var(--bg-color);
+            border-color: var(--secondary-color);
+        }
+        .keno-number.drawn {
+            background-color: #333;
+            border-color: #666;
+        }
+        .keno-number.hit {
+            background-color: var(--accent-color);
+            color: var(--bg-color);
+            border-color: var(--accent-color);
+        }
+        .keno-controls {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        .keno-results {
+            font-weight: bold;
+            color: var(--accent-color);
+            font-size: 1.2em;
+            margin: 5px 0 10px 0;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+
+<div class="casino-wrapper" id="casinoWrapper">
+    <div class="game-container">
+        <a href="index.html" style="color: var(--secondary-color); text-decoration: none; align-self: flex-start;">&larr; Назад в меню</a>
+        
+        <h1>🎱 Кено (Keno)</h1>
+        
+        <div class="header-controls">
+            <div class="display" id="balanceDisplay">Баланс: 500</div>
+            <div class="bet-input-group">
+                <span>Ставка:</span>
+                <input type="number" id="betAmount" value="10" min="10" max="1000">
+            </div>
+        </div>
+
+        <div class="game-view active" id="kenoView">
+            <p>Выберите **5 чисел** от 1 до 80. Совпадение 5/5: x100!</p>
+            <div class="keno-board" id="kenoBoard"></div>
+            <div class="keno-results" id="kenoResults"></div>
+            <div class="keno-controls">
+                <div class="display" id="kenoPicksDisplay">Выбрано: 0</div>
+                <button class="main-button" id="kenoPlayButton" onclick="playKeno()">Играть</button>
+                <button class="main-button" id="kenoClearButton" onclick="resetKeno()">Очистить</button>
+            </div>
+        </div>
+
+        <div class="display" id="message">Выберите 5 чисел и сделайте ставку.</div>
+    </div>
+</div>
+
+<audio id="audioClick" src="https://www.soundjay.com/buttons/button-2.mp3" preload="auto"></audio>
+<audio id="audioSpin" src="https://www.soundjay.com/misc/spinning-2.mp3" preload="auto"></audio>
+<audio id="audioWin" src="https://www.soundjay.com/misc/success-trumpet.mp3" preload="auto"></audio>
+<audio id="audioLose" src="https://www.soundjay.com/misc/fail-buzzer-01.mp3" preload="auto"></audio>
+
+<script>
+    /*
+    ================================
+    JAVASCRIPT ЛОГИКА ИГРЫ
+    ================================
+    */
+    
+    // ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ
+    let balance = 500;
+    let isSpinning = false; // Блокировка для игры
+    let kenoPicks = [];
+
+    // ------------------------------------
+    // ОБЩИЕ ФУНКЦИИ
+    // ------------------------------------
+
+    function playSound(name) {
+        const audio = document.getElementById(`audio${name.charAt(0).toUpperCase() + name.slice(1)}`);
+        if (audio) {
+            audio.currentTime = 0;
+            audio.play().catch(e => console.log("Audio playback failed:", e));
+        }
+    }
+
+    function getCurrentBet() {
+        const betInput = document.getElementById('betAmount');
+        let bet = parseInt(betInput.value) || 10;
+        bet = Math.min(Math.max(10, bet), balance || 10);
+        betInput.value = bet;
+        return bet;
+    }
+
+    function updateDisplay(msg = '') {
+        document.body.classList.remove('win-flash');
+        document.getElementById('balanceDisplay').textContent = `Баланс: ${balance} кредитов`;
+        if (msg) document.getElementById('message').textContent = msg;
+        
+        const currentBet = getCurrentBet();
+        const isBusy = isSpinning;
+
+        const kenoPlayButton = document.getElementById('kenoPlayButton');
+        kenoPlayButton.disabled = isBusy || balance < currentBet || kenoPicks.length !== 5;
+        if (kenoPicks.length !== 5 && !isBusy) kenoPlayButton.textContent = 'Выберите 5 чисел';
+        else if (!kenoPlayButton.disabled) kenoPlayButton.textContent = 'Играть';
+        
+        document.getElementById('kenoClearButton').disabled = isBusy;
+
+        if (balance < 10 && !isBusy) {
+            updateDisplay('💔 Недостаточно кредитов! Игра окончена.');
+        }
+    }
+
+    function triggerWinEffect() {
+        document.body.classList.add('win-flash');
+        playSound('win');
+        setTimeout(() => document.body.classList.remove('win-flash'), 1200);
+    }
+    
+    // ------------------------------------
+    // ЛОГИКА КЕНО
+    // ------------------------------------
+
+    function initializeKenoBoard() {
+        const board = document.getElementById('kenoBoard');
+        board.innerHTML = '';
+        for (let i = 1; i <= 80; i++) {
+            const numDiv = document.createElement('div');
+            numDiv.className = 'keno-number';
+            numDiv.textContent = i;
+            numDiv.dataset.number = i;
+            numDiv.onclick = () => selectKenoNumber(i, numDiv);
+            board.appendChild(numDiv);
+        }
+        resetKeno(false);
+    }
+    
+    function selectKenoNumber(number, element) {
+        if (isSpinning) return;
+
+        const index = kenoPicks.indexOf(number);
+        if (index > -1) {
+            kenoPicks.splice(index, 1);
+            element.classList.remove('selected');
+        } else if (kenoPicks.length < 5) {
+            kenoPicks.push(number);
+            element.classList.add('selected');
+        }
+        document.getElementById('kenoPicksDisplay').textContent = `Выбрано: ${kenoPicks.length}`;
+        updateDisplay('Выберите 5 чисел и сделайте ставку.');
+    }
+    
+    function resetKeno(clearMessage = true) {
+        if (isSpinning) return;
+        kenoPicks = [];
+        document.getElementById('kenoPicksDisplay').textContent = 'Выбрано: 0';
+        document.getElementById('kenoResults').textContent = '';
+        document.querySelectorAll('.keno-number').forEach(e => {
+            e.classList.remove('selected', 'hit', 'drawn');
+        });
+        if (clearMessage) updateDisplay('Выберите 5 чисел и сделайте ставку.');
+        updateDisplay();
+    }
+
+    function playKeno() {
+        const bet = getCurrentBet();
+        if (isSpinning || balance < bet || kenoPicks.length !== 5) return;
+        
+        isSpinning = true;
+        balance -= bet;
+        document.getElementById('kenoResults').textContent = 'ШАРЫ ВЫПАДАЮТ...';
+        updateDisplay('КЕНО: Игра идёт...');
+        playSound('spin');
+        
+        document.querySelectorAll('.keno-number').forEach(e => {
+            e.classList.remove('hit', 'drawn');
+        });
+
+        setTimeout(() => {
+            const drawnNumbers = [];
+            while (drawnNumbers.length < 20) {
+                const rand = Math.floor(Math.random() * 80) + 1;
+                if (!drawnNumbers.includes(rand)) {
+                    drawnNumbers.push(rand);
+                    const drawnElement = document.querySelector(`.keno-number[data-number="${rand}"]`);
+                    if (drawnElement) {
+                        drawnElement.classList.add('drawn');
+                    }
+                }
+            }
+            
+            checkKenoWin(bet, drawnNumbers);
+        }, 2000);
+    }
+    
+    function checkKenoWin(bet, drawnNumbers) {
+        const hits = kenoPicks.filter(pick => drawnNumbers.includes(pick));
+        let multiplier = 0;
+        
+        hits.forEach(number => {
+            const hitElement = document.querySelector(`.keno-number[data-number="${number}"]`);
+            if (hitElement) hitElement.classList.add('hit');
+        });
+
+        if (hits.length === 3) multiplier = 2;
+        else if (hits.length === 4) multiplier = 10;
+        else if (hits.length === 5) multiplier = 100;
+        
+        const winAmount = bet * multiplier;
+
+        if (winAmount > 0) {
+            balance += winAmount;
+            triggerWinEffect();
+            document.getElementById('kenoResults').textContent = `🎉 ПОБЕДА! Совпадений: ${hits.length}/5. Выигрыш: +${winAmount - bet} кредитов!`;
+        } else {
+            playSound('lose');
+            document.getElementById('kenoResults').textContent = `🙁 Проигрыш. Совпадений: ${hits.length}/5. Попробуйте еще.`;
+        }
+        
+        isSpinning = false;
+        updateDisplay();
+    }
+
+    // Инициализация
+    window.onload = () => {
+        initializeKenoBoard();
+    };
+</script>
+</body>
+</html>

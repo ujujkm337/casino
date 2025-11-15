@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Казино: Рулетка</title>
+    <style>
+        /* CSS СТИЛИ - Общие и для Рулетки */
+        :root {
+            --bg-color: #03040a;
+            --accent-color: #00ffaa;
+            --secondary-color: #9b56ff;
+            --text-color: #e6f7ff;
+            --red-color: #ff4757;
+            --black-color: #1e272e;
+            --main-font: 'Inter', sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: var(--main-font);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            overflow-x: hidden;
+        }
+        
+        body.win-flash { animation: win-pulse 0.2s 5 alternate; background-color: #1a222c; }
+        @keyframes win-pulse {
+            from { box-shadow: 0 0 10px var(--accent-color); }
+            to { box-shadow: 0 0 60px var(--accent-color); }
+        }
+
+        .casino-wrapper {
+            width: 95%;
+            max-width: 600px;
+            padding: 10px 0;
+            box-sizing: border-box;
+        }
+
+        .game-container {
+            padding: 15px;
+            border-radius: 15px;
+            background: rgba(1, 1, 1, 0.4);
+            box-shadow: 0 0 30px rgba(0, 0, 0, 0.5), 0 0 30px var(--secondary-color);
+            border: 2px solid var(--secondary-color);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .header-controls {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            width: 100%;
+            justify-content: space-around;
+        }
+        .display { font-size: 1.1em; font-weight: 700; color: var(--text-color); padding: 5px 15px; border-radius: 5px; border: 1px dashed rgba(255, 255, 255, 0.2); }
+        .bet-input-group { display: flex; align-items: center; gap: 5px; }
+        .bet-input-group input { width: 70px; padding: 5px; border-radius: 5px; border: 1px solid var(--accent-color); background-color: var(--bg-color); color: var(--text-color); text-align: center; }
+
+        .main-button { padding: 10px 20px; font-size: 1.2em; font-weight: 800; border: none; border-radius: 8px; cursor: pointer; background: linear-gradient(90deg, var(--secondary-color), var(--accent-color)); color: var(--bg-color); box-shadow: 0 5px 20px rgba(0, 255, 170, 0.4); transition: all 0.2s ease; text-transform: uppercase; }
+        .main-button:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 7px 25px rgba(0, 255, 170, 0.8); }
+        .main-button:disabled { background: #555; box-shadow: none; cursor: not-allowed; opacity: 0.6; }
+
+        /* Специфические стили для Рулетки */
+        .roulette-board-buttons {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 10px;
+        }
+        .roulette-wheel {
+            width: 150px;
+            height: 150px;
+            border-radius: 50%;
+            border: 5px solid #ccc;
+            margin: 20px auto;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2em;
+            font-weight: bold;
+            background: #222;
+            transition: transform 4s cubic-bezier(0.2, 0.8, 0.7, 1);
+        }
+        .roulette-btn {
+            padding: 10px 15px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        .bet-red { background-color: var(--red-color); color: white; }
+        .bet-black { background-color: var(--black-color); color: white; }
+        .bet-zero { background-color: green; color: white; }
+    </style>
+</head>
+<body>
+
+<div class="casino-wrapper" id="casinoWrapper">
+    <div class="game-container">
+        <a href="index.html" style="color: var(--secondary-color); text-decoration: none; align-self: flex-start;">&larr; Назад в меню</a>
+        
+        <h1>🔴⚫ Рулетка</h1>
+        
+        <div class="header-controls">
+            <div class="display" id="balanceDisplay">Баланс: 500</div>
+            <div class="bet-input-group">
+                <span>Ставка:</span>
+                <input type="number" id="betAmount" value="10" min="10" max="1000">
+            </div>
+        </div>
+
+        <div class="game-view active" id="rouletteView">
+            <p style="color:var(--red-color); font-weight: bold;">⚠️ Шансы сильно урезаны: Красное/Чёрное x1.5, Зеро x6.</p>
+            <div class="roulette-board">
+                <div class="roulette-wheel" id="rouletteWheel">?</div>
+            </div>
+            <div class="roulette-board-buttons">
+                <button class="roulette-btn bet-red" data-bet="red" onclick="placeRouletteBet('red')">Красное (x1.5)</button>
+                <button class="roulette-btn bet-black" data-bet="black" onclick="placeRouletteBet('black')">Чёрное (x1.5)</button>
+                <button class="roulette-btn bet-zero" data-bet="zero" onclick="placeRouletteBet('zero')">Зеро (x6)</button>
+            </div>
+        </div>
+
+        <div class="display" id="message">Выберите цвет и сделайте ставку!</div>
+    </div>
+</div>
+
+<audio id="audioClick" src="https://www.soundjay.com/buttons/button-2.mp3" preload="auto"></audio>
+<audio id="audioSpin" src="https://www.soundjay.com/misc/spinning-2.mp3" preload="auto"></audio>
+<audio id="audioWin" src="https://www.soundjay.com/misc/success-trumpet.mp3" preload="auto"></audio>
+<audio id="audioLose" src="https://www.soundjay.com/misc/fail-buzzer-01.mp3" preload="auto"></audio>
+
+<script>
+    /*
+    ================================
+    JAVASCRIPT ЛОГИКА ИГРЫ
+    ================================
+    */
+    
+    // ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ
+    let balance = 500;
+    let isSpinning = false; // Блокировка для игры
+
+    // ------------------------------------
+    // ОБЩИЕ ФУНКЦИИ
+    // ------------------------------------
+
+    function playSound(name) {
+        const audio = document.getElementById(`audio${name.charAt(0).toUpperCase() + name.slice(1)}`);
+        if (audio) {
+            audio.currentTime = 0;
+            audio.play().catch(e => console.log("Audio playback failed:", e));
+        }
+    }
+
+    function getCurrentBet() {
+        const betInput = document.getElementById('betAmount');
+        let bet = parseInt(betInput.value) || 10;
+        bet = Math.min(Math.max(10, bet), balance || 10);
+        betInput.value = bet;
+        return bet;
+    }
+
+    function updateDisplay(msg = '') {
+        document.body.classList.remove('win-flash');
+        document.getElementById('balanceDisplay').textContent = `Баланс: ${balance} кредитов`;
+        if (msg) document.getElementById('message').textContent = msg;
+        
+        const currentBet = getCurrentBet();
+        const isBusy = isSpinning;
+
+        document.querySelectorAll('.roulette-btn').forEach(button => {
+            button.disabled = isBusy || balance < currentBet;
+        });
+        
+        if (balance < 10 && !isBusy) {
+            updateDisplay('💔 Недостаточно кредитов! Игра окончена.');
+        }
+    }
+
+    function triggerWinEffect() {
+        document.body.classList.add('win-flash');
+        playSound('win');
+        setTimeout(() => document.body.classList.remove('win-flash'), 1200);
+    }
+    
+    // ------------------------------------
+    // ЛОГИКА РУЛЕТКИ (Шансы урезаны)
+    // ------------------------------------
+    
+    function placeRouletteBet(betColor) {
+        const bet = getCurrentBet();
+        if (isSpinning || balance < bet) return;
+        
+        isSpinning = true;
+        balance -= bet; 
+        updateDisplay(`РУЛЕТКА: Ваша ставка ${betColor} принята. Барабан крутится!`);
+        playSound('spin');
+        
+        const wheel = document.getElementById('rouletteWheel');
+        
+        // Сброс анимации
+        wheel.style.transition = 'none';
+        wheel.style.transform = 'rotate(0deg)';
+        wheel.style.removeProperty('background'); 
+        wheel.textContent = '?';
+        wheel.offsetWidth; // Force reflow
+        
+        const result = Math.floor(Math.random() * 37); // 0-36
+        const finalAngle = 360 - (result * (360 / 37) + (360 / 37 / 2));
+        
+        let finalColor = 'zero';
+        let winMultiplier = 0;
+
+        if (result === 0) { finalColor = 'zero'; winMultiplier = 6; }
+        else if (result % 2 === 0) { finalColor = 'red'; winMultiplier = 1.5; }
+        else { finalColor = 'black'; winMultiplier = 1.5; }
+
+        const totalRotation = 360 * 10 + finalAngle;
+        wheel.style.transition = 'transform 4s cubic-bezier(0.2, 0.8, 0.7, 1)';
+        wheel.style.transform = `rotate(${totalRotation}deg)`;
+
+        setTimeout(() => {
+            
+            if (finalColor === 'red') wheel.style.background = 'var(--red-color)';
+            else if (finalColor === 'black') wheel.style.background = 'var(--black-color)';
+            else wheel.style.background = 'green';
+            
+            wheel.textContent = result === 0 ? '0' : result;
+            
+            checkRouletteWin(betColor, finalColor, winMultiplier, bet);
+        }, 4000); 
+    }
+    
+    function checkRouletteWin(betColor, finalColor, multiplier, bet) {
+        let winAmount = 0;
+        let msg = `РУЛЕТКА: Выпало ${finalColor.toUpperCase()} (${multiplier}x).`;
+
+        if (betColor === finalColor) {
+            winAmount = Math.floor(bet * multiplier); 
+            balance += winAmount;
+            triggerWinEffect();
+            msg += ` 🎉 ВЫИГРЫШ! +${winAmount} кредитов!`;
+        } else {
+            playSound('lose');
+            msg += ' 🙁 Вы проиграли.';
+        }
+
+        updateDisplay(msg);
+        
+        setTimeout(() => {
+            isSpinning = false;
+            const wheel = document.getElementById('rouletteWheel');
+            wheel.textContent = '?';
+            wheel.style.removeProperty('background'); 
+            wheel.style.transition = 'none';
+            wheel.style.transform = 'rotate(0deg)';
+            updateDisplay(); 
+        }, 3000); 
+    }
+    
+    // Инициализация
+    window.onload = () => {
+        updateDisplay('Выберите цвет и сделайте ставку!');
+    };
+</script>
+</body>
+</html>

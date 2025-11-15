@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Казино: Слоты 3x3</title>
+    <style>
+        /*
+        ================================
+        ОБЩИЕ CSS СТИЛИ (для мобильных)
+        ================================
+        */
+        :root {
+            --bg-color: #03040a;
+            --accent-color: #00ffaa;
+            --secondary-color: #9b56ff;
+            --text-color: #e6f7ff;
+            --red-color: #ff4757;
+            --black-color: #1e272e;
+            --main-font: 'Inter', sans-serif;
+            --card-color: #f0f0f0;
+            --card-suit-red: #ff4757;
+            --card-suit-black: #1e272e;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: var(--main-font);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            overflow-x: hidden;
+        }
+        
+        body.win-flash { animation: win-pulse 0.2s 5 alternate; background-color: #1a222c; }
+        @keyframes win-pulse {
+            from { box-shadow: 0 0 10px var(--accent-color); }
+            to { box-shadow: 0 0 60px var(--accent-color); }
+        }
+
+        .casino-wrapper {
+            width: 95%;
+            max-width: 600px;
+            padding: 10px 0;
+            box-sizing: border-box;
+        }
+
+        .game-container {
+            padding: 15px;
+            border-radius: 15px;
+            background: rgba(1, 1, 1, 0.4);
+            box-shadow: 0 0 30px rgba(0, 0, 0, 0.5), 0 0 30px var(--secondary-color);
+            border: 2px solid var(--secondary-color);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .header-controls {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            width: 100%;
+            justify-content: space-around;
+        }
+        .display { font-size: 1.1em; font-weight: 700; color: var(--text-color); padding: 5px 15px; border-radius: 5px; border: 1px dashed rgba(255, 255, 255, 0.2); }
+        .bet-input-group { display: flex; align-items: center; gap: 5px; }
+        .bet-input-group input { width: 70px; padding: 5px; border-radius: 5px; border: 1px solid var(--accent-color); background-color: var(--bg-color); color: var(--text-color); text-align: center; }
+
+        .main-button { padding: 15px 30px; font-size: 1.5em; font-weight: 800; border: none; border-radius: 10px; cursor: pointer; background: linear-gradient(90deg, var(--secondary-color), var(--accent-color)); color: var(--bg-color); box-shadow: 0 5px 20px rgba(0, 255, 170, 0.4); transition: all 0.2s ease; text-transform: uppercase; }
+        .main-button:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 7px 25px rgba(0, 255, 170, 0.8); }
+        .main-button:disabled { background: #555; box-shadow: none; cursor: not-allowed; opacity: 0.6; }
+
+        /* ----- Слоты 3x3 Стили ----- */
+        .slots-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+            padding: 10px;
+            border: 3px solid var(--accent-color);
+            border-radius: 10px;
+            background: #111;
+        }
+        .reel {
+            width: 70px;
+            height: 70px;
+            font-size: 40px;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 6px;
+            background: #000;
+            border: 2px solid var(--secondary-color);
+            box-shadow: inset 0 0 8px rgba(255, 255, 255, 0.1);
+            overflow: hidden;
+        }
+        @media (max-width: 400px) {
+            .reel { width: 55px; height: 55px; font-size: 30px; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="casino-wrapper" id="casinoWrapper">
+    <div class="game-container">
+        <a href="index.html" style="color: var(--secondary-color); text-decoration: none; align-self: flex-start;">&larr; Назад в меню</a>
+        
+        <h1>🎰 Слоты 3x3</h1>
+        
+        <div class="header-controls">
+            <div class="display" id="balanceDisplay">Баланс: 500</div>
+            <div class="bet-input-group">
+                <span>Ставка:</span>
+                <input type="number" id="betAmount" value="10" min="10" max="1000">
+            </div>
+        </div>
+
+        <div class="game-view active" id="slotsView">
+            <p>Выигрыш по 8 линиям! Множители снижены.</p>
+            <div class="slots-grid" id="slotsGrid">
+                <div class="reel" id="reel1">🍒</div>
+                <div class="reel" id="reel2">🍋</div>
+                <div class="reel" id="reel3">🔔</div>
+                <div class="reel" id="reel4">💎</div>
+                <div class="reel" id="reel5">7️⃣</div>
+                <div class="reel" id="reel6">🍒</div>
+                <div class="reel" id="reel7">🍋</div>
+                <div class="reel" id="reel8">🔔</div>
+                <div class="reel" id="reel9">💎</div>
+            </div>
+            <button class="main-button" id="slotsSpinButton">Крутить</button>
+        </div>
+
+        <div class="display" id="message">Нажмите "Крутить!"</div>
+    </div>
+</div>
+
+<audio id="audioClick" src="https://www.soundjay.com/buttons/button-2.mp3" preload="auto"></audio>
+<audio id="audioSpin" src="https://www.soundjay.com/misc/spinning-2.mp3" preload="auto"></audio>
+<audio id="audioWin" src="https://www.soundjay.com/misc/success-trumpet.mp3" preload="auto"></audio>
+<audio id="audioLose" src="https://www.soundjay.com/misc/fail-buzzer-01.mp3" preload="auto"></audio>
+
+<script>
+    /*
+    ================================
+    JAVASCRIPT ЛОГИКА ИГР
+    ================================
+    */
+    const SYMBOLS = ['🍒', '🍋', '🔔', '💎', '7️⃣'];
+    const REEL_ELEMENTS = [];
+    for (let i = 1; i <= 9; i++) {
+        REEL_ELEMENTS.push(document.getElementById(`reel${i}`));
+    }
+    
+    // ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ
+    let balance = 500;
+    let isSpinning = false; // Блокировка для игры
+
+    // ------------------------------------
+    // ФУНКЦИИ УПРАВЛЕНИЯ ЗВУКОМ и ЭКРАНОМ
+    // ------------------------------------
+
+    function playSound(name) {
+        const audio = document.getElementById(`audio${name.charAt(0).toUpperCase() + name.slice(1)}`);
+        if (audio) {
+            audio.currentTime = 0;
+            audio.play().catch(e => console.log("Audio playback failed:", e));
+        }
+    }
+
+    function getCurrentBet() {
+        const betInput = document.getElementById('betAmount');
+        let bet = parseInt(betInput.value) || 10;
+        bet = Math.min(Math.max(10, bet), balance || 10);
+        betInput.value = bet;
+        return bet;
+    }
+
+    function updateDisplay(msg = '') {
+        document.body.classList.remove('win-flash');
+        document.getElementById('balanceDisplay').textContent = `Баланс: ${balance} кредитов`;
+        if (msg) document.getElementById('message').textContent = msg;
+        
+        const currentBet = getCurrentBet();
+        const isBusy = isSpinning;
+
+        document.querySelectorAll('.main-button').forEach(button => {
+            button.disabled = isBusy || balance < currentBet;
+            
+            if (button.id === 'slotsSpinButton') {
+                 button.textContent = isBusy ? 'Идёт игра...' : (balance < currentBet ? 'Нет кредитов' : 'Крутить');
+            }
+        });
+        
+        if (balance < 10 && !isBusy) {
+            updateDisplay('💔 Недостаточно кредитов! Игра окончена.');
+        }
+    }
+
+    function triggerWinEffect() {
+        document.body.classList.add('win-flash');
+        playSound('win');
+        setTimeout(() => document.body.classList.remove('win-flash'), 1200);
+    }
+    
+    // ------------------------------------
+    // ЛОГИКА СЛОТОВ 3x3
+    // ------------------------------------
+    
+    function spinSlots() {
+        const bet = getCurrentBet();
+        if (isSpinning || balance < bet) return;
+        
+        isSpinning = true;
+        balance -= bet;
+        updateDisplay('СЛОТЫ: Крутим...');
+        playSound('spin');
+
+        const finalResults = [];
+        let stopCount = 0;
+        
+        REEL_ELEMENTS.forEach(reel => reel.classList.add('spinning'));
+
+        REEL_ELEMENTS.forEach((reel, index) => {
+            const stopDelay = 1000 + (index * 100); 
+            
+            const spinInterval = setInterval(() => {
+                reel.textContent = SYMBOLS[Math.floor(Math.random() * SYMBOLS.length)];
+            }, 50);
+
+            setTimeout(() => {
+                clearInterval(spinInterval);
+                reel.classList.remove('spinning');
+                
+                const finalSymbol = SYMBOLS[Math.floor(Math.random() * SYMBOLS.length)];
+                reel.textContent = finalSymbol;
+                finalResults.push(finalSymbol);
+                stopCount++;
+                
+                if (stopCount === 9) {
+                    checkSlotsWin(finalResults, bet);
+                    playSound('click'); 
+                }
+            }, stopDelay);
+        });
+    }
+    
+    function checkSlotsWin(results, bet) {
+        let totalWin = 0;
+        const LINES = [
+            [0, 1, 2], [3, 4, 5], [6, 7, 8],
+            [0, 3, 6], [1, 4, 7], [2, 5, 8],
+            [0, 4, 8], [2, 4, 6]
+        ];
+
+        LINES.forEach(line => {
+            const [a, b, c] = line;
+            if (results[a] === results[b] && results[b] === results[c]) {
+                const symbol = results[a];
+                let winMultiplier = 0;
+                if (symbol === '7️⃣') { winMultiplier = 30; } 
+                else if (symbol === '💎') { winMultiplier = 20; } 
+                else { winMultiplier = 8; } 
+                totalWin += bet * winMultiplier;
+            }
+        });
+        
+        if (totalWin > 0) {
+            balance += totalWin;
+            triggerWinEffect();
+            updateDisplay(`🎉 СЛОТЫ: ВЫИГРЫШ! Выигрыш по ${totalWin / bet} линиям! +${totalWin} кредитов!`);
+        } else {
+            playSound('lose');
+            updateDisplay('🙁 СЛОТЫ: Проигрыш.');
+        }
+        
+        isSpinning = false;
+        updateDisplay();
+    }
+    document.getElementById('slotsSpinButton').addEventListener('click', spinSlots);
+
+    // Инициализация
+    window.onload = () => {
+        updateDisplay('Нажмите "Крутить!", чтобы начать игру.');
+    };
+</script>
+</body>
+</html>

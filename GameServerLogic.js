@@ -1,9 +1,8 @@
 // GameServerLogic.js (ИСПРАВЛЕННЫЙ КОД)
 
-// --- УТИЛИТЫ КАРТ ---
-
+// --- Утилиты Карт ---
 const cardRanks = ['2', '3', '4', '5', '6', '7', '8', '9', 'T', 'J', 'Q', 'K', 'A'];
-const cardSuits = ['C', 'D', 'H', 'S']; // Clubs, Diamonds, Hearts, Spades
+const cardSuits = ['C', 'D', 'H', 'S'];
 
 function calculateScore(hand) {
     let score = 0;
@@ -53,32 +52,33 @@ class Deck {
 // ----------------------
 
 // --- БАЗОВАЯ ЛОГИКА СТОЛА (Table) ---
-// Этот класс необходим для работы методов createTable/joinTable в GameServerLogic.
 
 class Table {
-    constructor(id, options) {
+    constructor(id, options, creatorId) { 
         this.id = id;
-        this.gameType = options.gameType || 'Blackjack'; 
-        this.maxPlayers = options.maxPlayers || 4;
+        this.creatorId = creatorId; // NEW: Храним ID создателя
+        this.gameType = options.gameType || 'Blackjack';
+        this.maxPlayers = options.maxPlayers || 6;
+        this.minPlayers = 2; // FIX: Минимум 2 игрока
         this.minBet = options.minBet || 10;
         this.isPrivate = options.isPrivate || false;
-        this.password = options.password || null;
-        this.players = {}; // { playerId: { ...player_data } }
-        this.dealerHand = []; // Используется в Блэкджеке
+        this.players = {};
+        this.dealerHand = [];
         this.state = 'WAITING_FOR_PLAYERS';
         this.deck = new Deck();
+        this.roundId = 0; 
     }
     
     addPlayer(player) {
         if (Object.keys(this.players).length >= this.maxPlayers) return false;
         
-        // Создаем упрощенную копию объекта игрока для стола
         this.players[player.id] = { 
             id: player.id,
             username: player.username,
             bet: 0, 
             hand: [],
-            active: false
+            active: false,
+            stood: false,
         };
         return true;
     }
@@ -90,9 +90,20 @@ class Table {
         }
         return false;
     }
-    
-    // ... Дополнительные методы для игры (placeBet, handleHit, handleStand)
-    // должны быть реализованы здесь, но опущены для фокуса на исправлении ошибки.
+
+    placeBet(playerId, amount) {
+        const player = this.players[playerId];
+        if (this.state !== 'BETTING_ROUND' || !player || amount < this.minBet) return false;
+
+        player.bet = amount;
+        player.active = true;
+        
+        // В реальной игре нужно обновить баланс игрока в GameServerLogic!
+        
+        this.sendTableState(this);
+        
+        return true;
+    }
 }
 
 // --- ОСНОВНОЙ КЛАСС СЕРВЕРА ---
@@ -106,26 +117,20 @@ class GameServerLogic {
         
         this.startTableLoop();
 
-        // Создание тестового стола при запуске (как в вашем логе)
-        this.createTable(null, { maxPlayers: 4, minBet: 10, gameType: 'Blackjack', isPrivate: false });
+        // Создание тестового стола (T1)
+        this.createTable({ id: 'System' }, { maxPlayers: 4, minBet: 10, gameType: 'Blackjack', isPrivate: false });
     }
 
-    // --- АУТЕНТИФИКАЦИЯ И УПРАВЛЕНИЕ ЛОББИ (ИСПРАВЛЕНИЕ ОШИБКИ) ---
+    // --- АУТЕНТИФИКАЦИЯ И УПРАВЛЕНИЕ ЛОББИ ---
 
-    /**
-     * Обрабатывает запрос авторизации от нового клиента.
-     * Создает профиль, если его нет, и отправляет данные игрока и список столов.
-     * @param {Socket} socket 
-     */
     handleAuth(socket) {
         let player = this.players[socket.id];
         
-        // 1. Создание профиля игрока (простая авторизация)
         if (!player) {
             player = {
                 id: socket.id,
                 username: `User-${Math.floor(Math.random() * 9000) + 1000}`,
-                balance: 5000, // Начальный баланс
+                balance: 5000, 
                 currentTableId: null,
                 socket: socket,
             };
@@ -133,21 +138,16 @@ class GameServerLogic {
             console.log(`New player registered: ${player.username} (${socket.id})`);
         }
         
-        // 2. Отправляем клиенту его ID, имя и баланс (auth_success)
         socket.emit('auth_success', { 
             id: player.id,
             username: player.username,
             balance: player.balance
         });
 
-        // 3. Отправляем клиенту список доступных столов (table_list)
         this.broadcastTableList(socket);
     }
     
-    /**
-     * Формирует и рассылает список доступных столов.
-     * @param {Socket} targetSocket - Если указан, отправляется только этому сокету.
-     */
+    // ИСПРАВЛЕН: Теперь передает minPlayers и creatorId
     broadcastTableList(targetSocket = null) {
         const tablesList = Object.values(this.tables).map(table => ({
             id: table.id,
@@ -155,6 +155,8 @@ class GameServerLogic {
             minBet: table.minBet,
             currentPlayers: Object.values(table.players).length,
             maxPlayers: table.maxPlayers,
+            minPlayers: table.minPlayers, // NEW
+            creatorId: table.creatorId, // NEW
             isPrivate: table.isPrivate,
             state: table.state
         }));
@@ -167,31 +169,88 @@ class GameServerLogic {
         return tablesList;
     }
     
-    // --- УПРАВЛЕНИЕ СТОЛАМИ И СОЕДИНЕНИЯМИ ---
-
+    // ИСПРАВЛЕН: Добавляет creatorId
     createTable(socket, options) {
+        const player = this.players[socket.id];
+        const creatorId = socket.id === 'System' ? 'System' : player?.id;
+        
+        if (!creatorId) return socket?.emit('error_message', 'Ошибка: Вы не авторизованы.');
+
+        options.maxPlayers = options.maxPlayers || 6;
+        
         const tableId = `T${this.tableCounter++}`;
-        const newTable = new Table(tableId, options);
+        const newTable = new Table(tableId, options, creatorId); // Передаем creatorId
         this.tables[tableId] = newTable;
         
-        if (socket) {
+        console.log(`Table created: ${tableId} (${newTable.gameType}) by ${creatorId}`);
+
+        if (creatorId !== 'System') {
             this.joinTable(socket, tableId);
         }
         
         this.broadcastTableList();
     }
     
+    // NEW: Метод для ручного старта игры
+    startGame(socket, tableId) {
+        const player = this.players[socket.id];
+        const table = this.tables[tableId];
+
+        if (!player || !table) {
+            return socket.emit('error_message', 'Стол не найден.');
+        }
+
+        // 1. Проверка создателя
+        if (player.id !== table.creatorId) {
+            return socket.emit('error_message', 'Только создатель стола может начать игру.');
+        }
+        
+        // 2. Проверка состояния и игроков
+        const playerCount = Object.values(table.players).length;
+        if (table.state !== 'WAITING_FOR_PLAYERS') {
+            return socket.emit('error_message', 'Игра уже идет.');
+        }
+        if (playerCount < table.minPlayers) {
+            return socket.emit('error_message', `Для начала игры нужно минимум ${table.minPlayers} игрока.`);
+        }
+        
+        // 3. Запуск игры (начинаем раунд ставок)
+        this.startBlackjackRound(table);
+        this.broadcastTableList(); 
+    }
+    
+    // NEW: Начало раунда Блэкджека (переход в состояние ставок)
+    startBlackjackRound(table) {
+        if (table.state !== 'WAITING_FOR_PLAYERS') return;
+
+        table.state = 'BETTING_ROUND';
+        table.roundId = Date.now(); 
+        table.deck.reset(); // Перемешиваем колоду
+        table.dealerHand = [];
+
+        Object.values(table.players).forEach(p => {
+            p.bet = 0;
+            p.hand = [];
+            p.active = true; // Игрок считается активным до тех пор, пока не покинет стол
+            p.stood = false;
+        });
+
+        console.log(`Round started (BETTING) for table ${table.id}`);
+        this.sendTableState(table); 
+    }
+
     joinTable(socket, tableId) {
         const player = this.players[socket.id];
         const table = this.tables[tableId];
 
-        if (!player || !table) { /* ... обработка ошибок ... */ return; }
+        if (!player || !table) { return socket.emit('error_message', 'Ошибка при входе в комнату.'); }
 
         if (table.addPlayer(player)) {
             player.currentTableId = tableId;
             socket.join(tableId);
             
-            // ... Логика отправки состояния стола
+            this.io.to(tableId).emit('table_joined', { tableId: tableId });
+            this.sendTableState(table);
             this.broadcastTableList();
         } else {
             socket.emit('error_message', 'Ошибка: Стол полон.');
@@ -210,14 +269,18 @@ class GameServerLogic {
             socket.leave(tableId);
             player.currentTableId = null;
             
-            // ... Логика уведомления игроков
+            this.io.to(tableId).emit('player_left', { playerId: player.id });
             
             if (Object.values(table.players).length === 0 && table.id !== 'T1') {
                 delete this.tables[tableId];
+            } else if (table.creatorId === player.id) {
+                // Если создатель ушел, назначаем первого игрока новым создателем
+                const newCreatorId = Object.keys(table.players)[0] || 'System';
+                table.creatorId = newCreatorId;
             }
         }
         
-        socket.emit('return_to_lobby', { tables: this.broadcastTableList() });
+        socket.emit('return_to_lobby', { tables: this.broadcastTableList() }); 
         this.broadcastTableList(); 
     }
 
@@ -232,32 +295,55 @@ class GameServerLogic {
         }
     }
 
-    // --- ЛОГИКА ИГР (ЗАГЛУШКИ) ---
     placeBet(socket, tableId, amount) {
-        socket.emit('error_message', 'Метод placeBet не реализован в этой версии.');
-    }
-    hit(socket, tableId) {
-        socket.emit('error_message', 'Метод hit не реализован в этой версии.');
-    }
-    stand(socket, tableId) {
-        socket.emit('error_message', 'Метод stand не реализован в этой версии.');
-    }
-    // ... и остальные методы (pokerAction и т.д.)
+        const player = this.players[socket.id];
+        const table = this.tables[tableId];
 
-    // --- ПАКЕТНЫЙ ЦИКЛ ОБНОВЛЕНИЯ (GAME LOOP) ---
-    startTableLoop() {
-        setInterval(() => {
-            Object.values(this.tables).forEach(table => {
-                // Здесь должна быть логика для смены состояния
-                // Например: старт раунда, ход ботов и т.д.
-            });
-        }, 1000); 
+        if (table?.placeBet(player.id, amount)) {
+            player.balance -= amount; // Снимаем деньги с баланса
+            socket.emit('auth_success', { id: player.id, balance: player.balance }); // Обновляем баланс
+            this.sendTableState(table); 
+        } else {
+            socket.emit('error_message', 'Не удалось принять ставку. Проверьте сумму и состояние стола.');
+        }
+    }
+    
+    hit(socket, tableId) {
+        // ... (логика hit)
+        socket.emit('error_message', 'Действие "Hit" пока не реализовано.');
+    }
+
+    stand(socket, tableId) {
+        // ... (логика stand)
+        socket.emit('error_message', 'Действие "Stand" пока не реализовано.');
     }
     
     sendTableState(table) {
-        // ... Логика отправки состояния стола
+        const tableState = {
+            id: table.id,
+            state: table.state,
+            creatorId: table.creatorId, 
+            minPlayers: table.minPlayers, 
+            dealerHand: table.dealerHand,
+            dealerScore: calculateScore(table.dealerHand),
+            players: Object.values(table.players).map(p => ({
+                id: p.id,
+                username: p.username,
+                bet: p.bet,
+                hand: p.hand,
+                score: calculateScore(p.hand),
+                active: p.active,
+                stood: p.stood,
+            }))
+        };
+        this.io.to(table.id).emit('table_state', tableState);
+    }
+
+    startTableLoop() {
+        setInterval(() => {
+            // В этом цикле может быть логика для автоматического продвижения игры
+        }, 1000); 
     }
 }
 
-// Экспорт класса, чтобы его можно было использовать в server.js
 module.exports = { GameServerLogic, Table, calculateScore, Deck };

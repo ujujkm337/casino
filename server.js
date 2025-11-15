@@ -43,6 +43,11 @@ io.on('connection', (socket) => {
     socket.on('create_table', (data) => {
         gameServer.createTable(socket, data);
     });
+    
+    // NEW: Запуск игры (для создателя)
+    socket.on('start_game', (data) => {
+        gameServer.startGame(socket, data.tableId);
+    });
 
     // Блэкджек действия
     socket.on('place_bet', (data) => {
@@ -56,7 +61,8 @@ io.on('connection', (socket) => {
     socket.on('stand', (data) => {
         gameServer.stand(socket, data.tableId);
     });
-    
+
+    // Обработка отключения
     socket.on('disconnect', () => {
         console.log(`User disconnected: ${socket.id}`);
         gameServer.handleDisconnect(socket);
@@ -64,5 +70,5 @@ io.on('connection', (socket) => {
 });
 
 server.listen(port, () => {
-    console.log(`Server running on port ${port}`);
+    console.log(`Server running at http://localhost:${port}`);
 });

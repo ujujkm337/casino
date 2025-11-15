@@ -3,325 +3,328 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Онлайн Блэкджек</title>
-    <style>
-        /*
-        ================================
-        ОБЩИЕ CSS СТИЛИ (для мобильных) - Оставлены по запросу
-        ================================
-        */
-        :root {
-            --bg-color: #03040a;
-            --accent-color: #00ffaa;
-            --secondary-color: #9b56ff;
-            --text-color: #e6f7ff;
-            --red-color: #ff4757;
-            --black-color: #1e272e;
-            --main-font: 'Inter', sans-serif;
-            --card-color: #f0f0f0;
-            --card-suit-red: #ff4757;
-            --card-suit-black: #1e272e;
-        }
-
-        body {
-            background-color: var(--bg-color);
-            color: var(--text-color);
-            font-family: var(--main-font);
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            min-height: 100vh;
-            margin: 0;
-            overflow-x: hidden;
-            text-align: center; /* Добавлено для центрирования контента */
-        }
-        
-        body.win-flash { animation: win-pulse 0.2s 5 alternate; background-color: #1a222c; }
-        @keyframes win-pulse {
-            from { box-shadow: 0 0 10px var(--accent-color); }
-            to { box-shadow: 0 0 60px var(--accent-color); }
-        }
-
-        .casino-wrapper {
-            width: 95%;
-            max-width: 600px;
-            padding: 10px 0;
-            box-sizing: border-box;
-        }
-
-        .game-container {
-            padding: 15px;
-            border-radius: 15px;
-            background: rgba(1, 1, 1, 0.4);
-            box-shadow: 0 0 30px rgba(0, 0, 0, 0.5), 0 0 30px var(--secondary-color);
-            border: 2px solid var(--secondary-color);
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 15px;
-        }
-
-        .header-controls {
-            display: flex;
-            gap: 15px;
-            align-items: center;
-            width: 100%;
-            justify-content: space-around;
-        }
-        .display { font-size: 1.1em; font-weight: 700; color: var(--text-color); padding: 5px 15px; border-radius: 5px; border: 1px dashed rgba(255, 255, 255, 0.2); }
-        .bet-input-group { display: flex; align-items: center; gap: 5px; }
-        .bet-input-group input { width: 70px; padding: 5px; border-radius: 5px; border: 1px solid var(--accent-color); background-color: var(--bg-color); color: var(--text-color); text-align: center; }
-
-        .main-button { padding: 15px 30px; font-size: 1.5em; font-weight: 800; border: none; border-radius: 10px; cursor: pointer; background: linear-gradient(90deg, var(--secondary-color), var(--accent-color)); color: var(--bg-color); box-shadow: 0 5px 20px rgba(0, 255, 170, 0.4); transition: all 0.2s ease; text-transform: uppercase; }
-        .main-button:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 7px 25px rgba(0, 255, 170, 0.8); }
-        .main-button:disabled { background: #555; box-shadow: none; cursor: not-allowed; opacity: 0.6; }
-
-
-        /* ----- Блэкджек Стили (Адаптированные для онлайн) ----- */
-        .hand-container { 
-            text-align: center; 
-            min-height: 55px; 
-            margin-bottom: 15px;
-            display: flex; 
-            justify-content: center;
-            gap: 5px;
-        }
-        .card-container { display: inline-block; }
-        .card { 
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
-            align-items: center;
-            width: 45px; 
-            height: 70px; 
-            font-size: 1em;
-            background-color: var(--card-color); 
-            border: 1px solid #777; 
-            border-radius: 6px; 
-            box-shadow: 1px 1px 3px rgba(0, 0, 0, 0.5); 
-            text-align: center;
-            font-weight: 700;
-            color: var(--card-suit-black);
-            padding: 2px 0;
-            box-sizing: border-box;
-        }
-        .red-suit { color: var(--card-suit-red); }
-        .card-suit-symbol { font-size: 1.2em; line-height: 1; }
-        .card-back { background-color: #555; border: 3px solid var(--secondary-color); color: var(--text-color); font-size: 1.5em; display: flex; justify-content: center; align-items: center; }
-
-        /* Стили для лобби */
-        .table-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 10px;
-            border: 1px solid var(--accent-color);
-            border-radius: 8px;
-            background: rgba(0, 255, 170, 0.1);
-        }
-        .table-item span { font-weight: bold; }
-
-    </style>
+    <title>Казино: Блэкджек (Онлайн)</title>
+    <!-- ПОДКЛЮЧАЕМ НОВЫЙ СТИЛЬ -->
+    <link rel="stylesheet" href="style.css">
+    <!-- Подключаем Socket.io -->
     <script src="/socket.io/socket.io.js"></script>
 </head>
 <body>
-    <div class="casino-wrapper">
-        <div class="game-container">
-            <a href="index.html" class="main-button" style="width: auto; padding: 5px 10px; font-size: 1em; align-self: flex-start;">← Назад</a>
-            <div class="header-controls" style="justify-content: center;">
-                <div class="display" id="balanceDisplay">БАЛАНС: 0</div>
-            </div>
-            
-            <h1 style="color:var(--accent-color);">🃏 ОНЛАЙН БЛЭКДЖЕК</h1>
-            <div class="display" id="messageDisplay" style="width: 100%; text-align: center; color: var(--text-color);">Подключение...</div>
-            
-            <div id="lobbyView" style="width: 100%; max-width: 450px; display: none;">
-                <h3 style="color:var(--secondary-color); margin-top: 5px;">ДОСТУПНЫЕ СТОЛЫ</h3>
-                <div id="tablesList" style="display:flex; flex-direction:column; gap:10px;">
-                    </div>
-            </div>
-            
-            <div id="gameView" style="display: none; width: 100%; max-width: 450px;">
-                
-                <h3 style="color:var(--red-color); margin-bottom: 0;">ДИЛЕР <span id="dealerScore"></span></h3>
-                <div id="dealerHand" class="hand-container"></div>
-                
-                <h3 style="color:var(--accent-color); margin-bottom: 0;">ВЫ <span id="playerScore"></span></h3>
-                <div id="playerHand" class="hand-container"></div>
-                
-                <div id="betControls" style="margin: 20px 0; display:none; display:flex; justify-content:center; gap:10px;">
-                    <input type="number" id="betAmount" value="50" min="10" class="bet-input-group" style="width: 100px;">
-                    <button id="placeBetBtn" class="main-button" style="padding: 10px 20px; font-size: 1.2em;">ПОСТАВИТЬ</button>
-                </div>
-                
-                <div id="actionButtons" style="margin: 20px 0; display: none; display: flex; gap: 10px; justify-content:center;">
-                    <button id="hitBtn" class="main-button" style="padding: 10px 20px; font-size: 1.2em;" disabled>ВЗЯТЬ (HIT)</button>
-                    <button id="standBtn" class="main-button" style="padding: 10px 20px; font-size: 1.2em;" disabled>СТОП (STAND)</button>
-                </div>
 
-                <button id="leaveTableBtn" class="main-button" style="margin-top: 15px; background: #555; box-shadow: none; padding: 10px 20px; font-size: 1.2em;">ВЫЙТИ ИЗ КОМНАТЫ</button>
+<div class="casino-wrapper" id="casinoWrapper">
+    <div class="game-container">
+        <a href="index.html" class="main-button" style="width: auto; padding: 5px 10px; font-size: 1em; align-self: flex-start; background: #555;">← Назад</a>
+        
+        <h1 style="color:var(--neon-blue); text-shadow: var(--shadow-blue);">🃏 ОНЛАЙN БЛЭКДЖЕК</h1>
+        
+        <div class="header-controls">
+            <div class="display" id="balanceDisplay">Баланс: 0</div>
+        </div>
+        
+        <div class="display" id="messageDisplay" style="width: 90%; text-align: center; color: var(--neon-text);">Подключение...</div>
+
+        <!-- ЛОББИ (Выбор комнат) -->
+        <div id="lobbyView" style="width: 100%; display: flex; flex-direction: column; gap: 10px;">
+            <h3 style="color:var(--neon-pink); margin: 5px 0;">ДОСТУПНЫЕ СТОЛЫ</h3>
+            <div id="tablesList" style="display:flex; flex-direction:column; gap:10px;">
+                <!-- Комнаты будут здесь -->
             </div>
+            
+            <!-- Кнопка создания своей комнаты -->
+            <button id="createRoomBtn" class="main-button" style="background: var(--neon-blue); box-shadow: var(--shadow-blue); margin-top: 10px;">СОЗДАТЬ СВОЮ КОМНАТУ</button>
+        </div>
+
+        <!-- ИГРА -->
+        <div class="game-view" id="gameView" style="display: none; width: 100%;">
+            <div class="hand-display">
+                <p style="color:var(--neon-red);">Дилер: (Счет: <span id="dealerScore">?</span>)</p>
+                <div id="dealerHand" class="hand-container"></div>
+            </div>
+            <div class="hand-display">
+                <p style="color:var(--neon-green);">Вы: (Счет: <span id="playerScore">?</span>)</p>
+                <div id="playerHand" class="hand-container"></div>
+            </div>
+            
+            <!-- Контроль Ставок -->
+            <div id="betControls" style="display: flex; gap: 10px; align-items: center; justify-content: center; width: 100%; margin: 15px 0;">
+                <input type="number" id="betAmount" value="10" min="10" max="1000" class="bet-input">
+                <button class="main-button" id="placeBetBtn" style="padding: 10px 15px; font-size: 1em; width: auto;">ПОСТАВИТЬ</button>
+            </div>
+            
+            <!-- Контроль Игры -->
+            <div id="actionButtons" style="display: none; gap: 10px; width: 100%;">
+                <button class="main-button" id="blackjackHitButton" style="background: var(--neon-green); box-shadow: var(--shadow-green);" disabled>ВЗЯТЬ (Hit)</button>
+                <button class="main-button" id="blackjackStandButton" style="background: var(--neon-red); box-shadow: var(--shadow-red);" disabled>ХВАТИТ (Stand)</button>
+            </div>
+            
+            <button id="leaveTableBtn" class="main-button" style="margin-top: 20px; background: #444; box-shadow: none; padding: 10px;">ВЫЙТИ ИЗ КОМНАТЫ</button>
         </div>
     </div>
+</div>
 
-    <script>
-        // --- JS Логика Клиента ---
-        const socket = io();
-        let balance = parseInt(localStorage.getItem('casinoBalance')) || 1000;
-        let playerId = null;
-        let currentTableId = null;
+<script>
+    // ====================================================================
+    // --- КЛИЕНТСКИЙ JAVASCRIPT (НОВЫЙ, ДЛЯ ОНЛАЙНА) ---
+    // ====================================================================
+    
+    const socket = io();
+    let balance = 1000;
+    let playerId = null;
+    let currentTableId = null;
 
-        // --- УТИЛИТЫ UI ---
-        function renderCard(cardData, targetElementId, faceUp = true) {
-            const container = document.getElementById(targetElementId);
-            const cardElement = document.createElement('div');
-            cardElement.className = 'card-container';
-            
-            const rank = cardData.length > 1 ? cardData.slice(0, -1) : '?';
-            const suit = cardData.length > 1 ? cardData.slice(-1) : '?';
-            
-            const suitsMap = { 'C': '♣', 'D': '♦', 'H': '♥', 'S': '♠' };
-            const isRed = suit === 'H' || suit === 'D';
-            const suitSymbol = suitsMap[suit] || '?';
-            
-            if (!faceUp) {
-                cardElement.innerHTML = `<div class="card card-back">BJ</div>`;
-            } else {
-                cardElement.innerHTML = `
-                    <div class="card ${isRed ? 'red-suit' : 'black-suit'}">
-                        <span style="align-self: flex-start; margin-left: 3px; font-size: 0.8em;">${rank}</span>
-                        <span class="card-suit-symbol">${suitSymbol}</span>
-                        <span style="align-self: flex-end; margin-right: 3px; font-size: 0.8em; transform:rotate(180deg);">${rank}</span>
-                    </div>
-                `;
-            }
-            container.appendChild(cardElement);
-        }
+    // --- DOM Элементы ---
+    const balanceDisplay = document.getElementById('balanceDisplay');
+    const messageDisplay = document.getElementById('messageDisplay');
+    const lobbyView = document.getElementById('lobbyView');
+    const gameView = document.getElementById('gameView');
+    const tablesList = document.getElementById('tablesList');
+    const createRoomBtn = document.getElementById('createRoomBtn');
+    
+    const dealerHandEl = document.getElementById('dealerHand');
+    const playerHandEl = document.getElementById('playerHand');
+    const dealerScoreEl = document.getElementById('dealerScore');
+    const playerScoreEl = document.getElementById('playerScore');
+    
+    const betControls = document.getElementById('betControls');
+    const betAmountInput = document.getElementById('betAmount');
+    const placeBetBtn = document.getElementById('placeBetBtn');
+    
+    const actionButtons = document.getElementById('actionButtons');
+    const hitBtn = document.getElementById('blackjackHitButton');
+    const standBtn = document.getElementById('blackjackStandButton');
+    const leaveTableBtn = document.getElementById('leaveTableBtn');
 
-        function updateGlobalBalance(newBalance) {
-            balance = newBalance;
-            localStorage.setItem('casinoBalance', balance);
-            document.getElementById('balanceDisplay').textContent = `БАЛАНС: ${balance}`;
-        }
-
-        function updateDisplay(msg = 'Сделайте ставку или ждите хода.') {
-            document.getElementById('messageDisplay').innerHTML = msg;
-        }
-
-        function clearHands() {
-            document.getElementById('dealerHand').innerHTML = '';
-            document.getElementById('playerHand').innerHTML = '';
-            document.getElementById('dealerScore').textContent = '';
-            document.getElementById('playerScore').textContent = '';
-        }
+    // --- Утилиты UI ---
+    
+    function renderCard(cardData, isFaceDown = false) {
+        const cardContainer = document.createElement('div');
+        cardContainer.className = 'card-container';
         
-        function showLobby() {
-            document.getElementById('lobbyView').style.display = 'flex';
-            document.getElementById('gameView').style.display = 'none';
-            currentTableId = null;
-            clearHands();
-            updateDisplay('Выберите стол для игры.');
-            socket.emit('auth_request'); // Запрос списка столов
-        }
-
-        function showGame() {
-            document.getElementById('lobbyView').style.display = 'none';
-            document.getElementById('gameView').style.display = 'flex';
-        }
+        const rank = cardData.length > 1 ? cardData.slice(0, -1) : '?';
+        const suit = cardData.length > 1 ? cardData.slice(-1) : '?';
         
-        // --- SOCKET.IO HANDLERS ---
-        socket.on('connect', () => { socket.emit('auth_request'); });
+        const suitsMap = { 'C': '♣', 'D': '♦', 'H': '♥', 'S': '♠' };
+        const isRed = suit === 'H' || suit === 'D';
+        const suitSymbol = suitsMap[suit] || '?';
         
-        socket.on('auth_success', (data) => {
-            playerId = data.id;
-            updateGlobalBalance(data.balance);
-            if (!currentTableId) {
-                showLobby();
-                renderTableList(data.tables);
-            }
-        });
-        
-        socket.on('error_message', (msg) => { alert('[Ошибка]: ' + msg); updateDisplay(`❌ Ошибка: ${msg}`); });
-
-        function renderTableList(tables) {
-            const list = document.getElementById('tablesList');
-            list.innerHTML = '';
-            tables.filter(t => t.gameType === 'Blackjack').forEach(table => {
-                const item = document.createElement('div');
-                item.className = 'table-item';
-                item.innerHTML = `
-                    <span>Стол ${table.id.toUpperCase()} | Ставка от ${table.minBet} | Игроков: ${table.currentPlayers}/${table.maxPlayers}</span>
-                    <button class="main-button" onclick="joinTable('${table.id}', false)" style="width: auto; padding: 5px 15px; font-size: 1em;">СЕСТЬ</button>
-                `;
-                list.appendChild(item);
-            });
-            // Добавим отдельную кнопку для стола с ботами, если хотим
-            list.innerHTML += `
-                <div class="table-item" style="border-color: var(--secondary-color);">
-                    <span>СТОЛ С БОТАМИ (b1) | Игроков: 1-4</span>
-                    <button class="main-button" onclick="joinTable('b1', true)" style="width: auto; padding: 5px 15px; font-size: 1em; background: #333; box-shadow:none;">СЕСТЬ С БОТАМИ</button>
+        if (isFaceDown) {
+            cardContainer.innerHTML = `<div class="card card-back">CASINO</div>`;
+        } else {
+            cardContainer.innerHTML = `
+                <div class="card ${isRed ? 'red-suit' : ''}">
+                    <span style="align-self: flex-start; margin-left: 3px; font-size: 0.8em;">${rank}</span>
+                    <span class="card-suit-symbol">${suitSymbol}</span>
+                    <span style="align-self: flex-end; margin-right: 3px; font-size: 0.8em; transform:rotate(180deg);">${rank}</span>
                 </div>
             `;
         }
-        
-        socket.on('game_start', (data) => {
-            currentTableId = data.tableId;
-            showGame();
-            updateDisplay('Игра началась! Сделайте вашу ставку.');
-        });
-        
-        socket.on('table_state', (data) => {
-            clearHands();
-            const selfData = data.players.find(p => p.id === playerId);
-            
-            // Рендер Дилера
-            data.dealerHand.forEach((card, index) => {
-                const isFaceDown = (data.state === 'WAITING_FOR_BETS' || data.state === 'DEALING') && index === 1;
-                renderCard(card, 'dealerHand', !isFaceDown);
-            });
-            document.getElementById('dealerScore').textContent = data.dealerScore > 0 && data.state !== 'PLAYER_TURN' ? `(${data.dealerScore})` : '';
+        return cardContainer;
+    }
 
-            // Рендер Игрока
-            if (selfData) {
-                selfData.hand.forEach(card => renderCard(card, 'playerHand', true));
-                document.getElementById('playerScore').textContent = `(${selfData.score})`;
-            }
+    function updateGlobalBalance(newBalance) {
+        balance = newBalance;
+        balanceDisplay.textContent = `Баланс: ${balance}`;
+        betAmountInput.max = balance;
+        // Сохраняем в localStorage для других страниц
+        localStorage.setItem('casinoBalance', balance);
+    }
 
-            // Управление UI
-            document.getElementById('betControls').style.display = data.state === 'WAITING_FOR_BETS' && selfData && selfData.bet === 0 ? 'flex' : 'none';
-            document.getElementById('actionButtons').style.display = data.state === 'PLAYER_TURN' && selfData && selfData.active && selfData.hand.length > 0 ? 'flex' : 'none';
-            
-            if (data.state === 'PLAYER_TURN' && selfData && selfData.active) updateDisplay(`ВАШ ХОД! Ставка: ${selfData.bet}`);
-            else if (data.state === 'WAITING_FOR_BETS' && selfData && selfData.bet === 0) updateDisplay(`Сделайте ставку.`);
-            else if (data.state === 'WAITING_FOR_BETS' && selfData && selfData.bet > 0) updateDisplay(`Ожидаем ставки от других игроков. Ваша ставка: ${selfData.bet}`);
-        });
+    function showLobby() {
+        lobbyView.style.display = 'flex';
+        gameView.style.display = 'none';
+        currentTableId = null;
+        messageDisplay.textContent = 'Выберите стол для игры.';
+    }
 
-        socket.on('game_results', (data) => {
-            // ... логика отображения результата и выигрыша ...
-        });
+    function showGame(tableId) {
+        lobbyView.style.display = 'none';
+        gameView.style.display = 'flex';
+        currentTableId = tableId;
+        messageDisplay.textContent = `Вы за столом ${tableId}. Ожидаем начала...`;
+    }
 
-        socket.on('return_to_lobby', () => { showLobby(); });
-        
-
-        // --- КЛИЕНТСКИЕ КНОПКИ ---
-        function joinTable(tableId, wantsBots = false) { 
-            socket.emit('join_table', { tableId: tableId, gameType: 'Blackjack', wantsBots: wantsBots }); 
+    // --- SOCKET.IO СЛУШАТЕЛИ ---
+    
+    socket.on('connect', () => {
+        messageDisplay.textContent = 'Подключено. Запрос данных...';
+        // Загружаем баланс из localStorage, если он есть
+        balance = parseInt(localStorage.getItem('casinoBalance')) || 1000;
+        socket.emit('auth_request'); 
+    });
+    
+    socket.on('auth_success', (data) => {
+        playerId = data.id;
+        updateGlobalBalance(data.balance);
+        if (!currentTableId) {
+            renderTableList(data.tables);
+            showLobby();
         }
-        
-        document.getElementById('placeBetBtn').onclick = () => {
-            const amount = parseInt(document.getElementById('betAmount').value);
-            if (amount >= 10 && amount <= balance) { 
-                socket.emit('place_bet', { tableId: currentTableId, amount: amount }); 
-            } else {
-                 alert('Неверная сумма ставки.');
-            }
-        };
-        document.getElementById('hitBtn').onclick = () => { socket.emit('hit', { tableId: currentTableId }); };
-        document.getElementById('standBtn').onclick = () => { socket.emit('stand', { tableId: currentTableId }); };
-        document.getElementById('leaveTableBtn').onclick = () => { if (confirm("Вы уверены?")) { socket.emit('leave_table'); } };
+    });
+    
+    socket.on('update_table_list', (tables) => {
+        if (!currentTableId) { // Обновляем лобби, только если мы в нем
+            renderTableList(tables);
+        }
+    });
 
-        window.onload = () => { updateGlobalBalance(balance); };
-    </script>
+    function renderTableList(tables) {
+        tablesList.innerHTML = '';
+        tables.filter(t => t.gameType === 'Blackjack').forEach(table => {
+            const item = document.createElement('div');
+            item.className = 'table-item';
+            const statusColor = table.currentPlayers >= table.maxPlayers ? 'var(--neon-red)' : 'var(--neon-green)';
+            
+            item.innerHTML = `
+                <div style="text-align: left;">
+                    <span style="color:var(--neon-blue);">${table.name} (ID: ${table.id})</span><br>
+                    <span style="font-size: 0.9em;">Мин. ставка: ${table.minBet} | 
+                    <span style="color:${statusColor};">Игроков: ${table.currentPlayers}/${table.maxPlayers}</span></span>
+                </div>
+                <button class="main-button" onclick="joinTable('${table.id}', ${table.id === 'b1'})" 
+                        style="width: auto; padding: 5px 15px; font-size: 1em;"
+                        ${table.currentPlayers >= table.maxPlayers ? 'disabled' : ''}>
+                    СЕСТЬ
+                </button>
+            `;
+            tablesList.appendChild(item);
+        });
+    }
+    
+    socket.on('game_start', (data) => {
+        showGame(data.tableId);
+    });
+    
+    // ГЛАВНЫЙ ОБНОВИТЕЛЬ СТОЛА
+    socket.on('table_state', (data) => {
+        if (!currentTableId) return; // Если мы не за столом, игнорируем
+        
+        dealerHandEl.innerHTML = '';
+        playerHandEl.innerHTML = '';
+        
+        // Рендер Дилера
+        data.dealerHand.forEach((cardRank, index) => {
+            const isFaceDown = (cardRank === 'BACK');
+            dealerHandEl.appendChild(renderCard(cardRank, isFaceDown));
+        });
+        dealerScoreEl.textContent = `(${data.dealerScore})`;
+
+        // Рендер Игроков (ищем себя)
+        const selfData = data.players.find(p => p.id === playerId);
+        if (selfData) {
+            selfData.hand.forEach(cardRank => {
+                playerHandEl.appendChild(renderCard(cardRank, false));
+            });
+            playerScoreEl.textContent = `(${selfData.score})`;
+            
+            // Управление UI
+            if (data.state === 'WAITING_FOR_BETS' && selfData.bet === 0) {
+                betControls.style.display = 'flex';
+                actionButtons.style.display = 'none';
+                messageDisplay.textContent = 'Сделайте вашу ставку.';
+            } else if (data.state === 'PLAYER_TURN' && selfData.active) {
+                betControls.style.display = 'none';
+                actionButtons.style.display = 'flex';
+                hitBtn.disabled = false;
+                standBtn.disabled = false;
+                messageDisplay.textContent = 'ВАШ ХОД!';
+            } else {
+                betControls.style.display = 'none';
+                actionButtons.style.display = 'none';
+                hitBtn.disabled = true;
+                standBtn.disabled = true;
+                if (data.state === 'WAITING_FOR_BETS') {
+                     messageDisplay.textContent = `Ожидаем ставки... (Ваша: ${selfData.bet})`;
+                } else {
+                     messageDisplay.textContent = 'Ожидаем хода других игроков...';
+                }
+            }
+        }
+    });
+
+    socket.on('game_results', (data) => {
+        const result = data.results[playerId];
+        if (result) {
+            updateGlobalBalance(result.newBalance);
+            messageDisplay.innerHTML = `<strong>${result.message}</strong><br>Ожидание нового раунда...`;
+            
+            // Показываем финальные карты дилера
+            dealerHandEl.innerHTML = '';
+            data.dealerHand.forEach(card => dealerHandEl.appendChild(renderCard(card, false)));
+            dealerScoreEl.textContent = `(${data.dealerScore})`;
+        }
+    });
+    
+    // ИСПРАВЛЕНИЕ КНОПКИ ВЫХОДА
+    socket.on('return_to_lobby', (data) => {
+        currentTableId = null;
+        renderTableList(data.tables); // Обновляем список столов
+        showLobby();
+        messageDisplay.textContent = 'Вы вышли из-за стола.';
+    });
+
+    socket.on('error_message', (msg) => {
+        messageDisplay.textContent = `❌ Ошибка: ${msg}`;
+    });
+    
+    socket.on('bet_accepted', (data) => {
+        updateGlobalBalance(data.newBalance);
+    });
+
+    // --- КЛИЕНТСКИЕ КНОПКИ ---
+    
+    function joinTable(tableId, wantsBots = false) { 
+        socket.emit('join_table', { tableId: tableId, wantsBots: wantsBots }); 
+    }
+    
+    createRoomBtn.onclick = () => {
+        const maxPlayers = parseInt(prompt("Макс. игроков (2-5):", "4"));
+        const minBet = parseInt(prompt("Минимальная ставка:", "25"));
+        const isPrivate = confirm("Сделать комнату приватной (с паролем)?");
+        let password = null;
+        if (isPrivate) password = prompt("Введите пароль:");
+        
+        if (maxPlayers >= 2 && minBet >= 1) {
+            socket.emit('create_table', { maxPlayers, minBet, isPrivate, password });
+        }
+    };
+    
+    placeBetBtn.onclick = () => {
+        const amount = parseInt(betAmountInput.value);
+        if (amount >= 10 && amount <= balance) { 
+            socket.emit('place_bet', { tableId: currentTableId, amount: amount }); 
+        } else {
+             alert('Неверная сумма ставки.');
+        }
+    };
+    
+    hitBtn.onclick = () => { 
+        hitBtn.disabled = true; 
+        standBtn.disabled = true;
+        socket.emit('hit', { tableId: currentTableId }); 
+    };
+    
+    standBtn.onclick = () => { 
+        hitBtn.disabled = true; 
+        standBtn.disabled = true;
+        socket.emit('stand', { tableId: currentTableId }); 
+    };
+    
+    leaveTableBtn.onclick = () => { 
+        if (confirm("Вы уверены, что хотите покинуть стол?")) { 
+            socket.emit('leave_table'); 
+        } 
+    };
+
+    // --- Инициализация ---
+    window.onload = () => {
+        // Загрузка баланса из localStorage
+        const storedBalance = localStorage.getItem('casinoBalance');
+        if (storedBalance) {
+            balance = parseInt(storedBalance);
+        }
+        updateGlobalBalance(balance);
+        showLobby(); // Показываем лобби при загрузке
+    };
+</script>
 </body>
 </html>

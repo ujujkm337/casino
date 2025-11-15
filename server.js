@@ -1,21 +1,23 @@
 // server.js
-
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 const path = require('path');
-const { GameServerLogic } = require('./GameServerLogic'); // Логика игры вынесена в отдельный файл
+// Подключаем НОВУЮ, ИСПРАВЛЕННУЮ логику
+const { GameServerLogic } = require('./GameServerLogic'); 
 
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 const port = process.env.PORT || 3000;
 
-// ******************************************************
-// *** ИСПРАВЛЕНИЕ ДЛЯ RENDER:
-// *** Обслуживаем статические файлы из КОРНЕВОЙ директории (так как нет папки public)
-// ******************************************************
-app.use(express.static(__dirname));
+// Обслуживаем статические файлы из КОРНЕВОЙ директории
+app.use(express.static(__dirname)); 
+
+// Явный маршрут для главной страницы
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'index.html'));
+});
 
 // Инициализация серверной логики игры
 const gameServer = new GameServerLogic(io);
@@ -24,19 +26,22 @@ const gameServer = new GameServerLogic(io);
 io.on('connection', (socket) => {
     console.log(`User connected: ${socket.id}`);
     
-    // Авторизация и получение списка столов
+    // Авторизация
     socket.on('auth_request', () => {
         gameServer.handleAuth(socket);
     });
 
-    // Действия игрока
+    // Действия в лобби
     socket.on('join_table', (data) => {
-        // Добавлен wantsBots для Блэкджека
-        gameServer.joinTable(socket, data.tableId, data.gameType, data.wantsBots);
+        gameServer.joinTable(socket, data.tableId, data.wantsBots);
     });
     
     socket.on('leave_table', () => {
         gameServer.leaveTable(socket);
+    });
+    
+    socket.on('create_table', (data) => {
+        gameServer.createTable(socket, data);
     });
 
     // Блэкджек действия
@@ -50,19 +55,6 @@ io.on('connection', (socket) => {
 
     socket.on('stand', (data) => {
         gameServer.stand(socket, data.tableId);
-    });
-
-    // Покер действия (упрощенные)
-    socket.on('call_check', (data) => {
-        gameServer.pokerAction(socket, data.tableId, 'call');
-    });
-
-    socket.on('raise', (data) => {
-        gameServer.pokerAction(socket, data.tableId, 'raise', data.amount);
-    });
-
-    socket.on('fold', (data) => {
-        gameServer.pokerAction(socket, data.tableId, 'fold');
     });
     
     socket.on('disconnect', () => {

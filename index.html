@@ -3,74 +3,37 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Главное меню Казино РЖДК</title>
+    <title>Главное меню Казино</title>
+    <!-- ПОДКЛЮЧАЕМ НОВЫЙ СТИЛЬ -->
+    <link rel="stylesheet" href="style.css">
+    
+    <!-- Стили для index, которые не нужны в других файлах -->
     <style>
-        :root {
-            --bg-color: #03040a;
-            --accent-color: #00ffaa;
-            --text-color: #e6f7ff;
-            --secondary-color: #9b56ff;
-        }
-        body {
-            background-color: var(--bg-color);
-            color: var(--text-color);
-            font-family: sans-serif;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            min-height: 100vh;
-            margin: 0;
-            padding: 20px;
-        }
         h1 { 
-            color: var(--accent-color); 
-            text-shadow: 0 0 10px rgba(0, 255, 170, 0.5); 
+            color: var(--neon-blue); 
+            text-shadow: var(--shadow-blue); 
             text-align: center;
-        }
-        .game-menu {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-            gap: 15px;
-            max-width: 650px;
-            width: 100%;
-            margin-top: 30px;
-        }
-        .game-item {
-            text-decoration: none;
-            color: var(--text-color);
-            background: #1a1a2e;
-            padding: 15px 10px;
-            border-radius: 10px;
-            text-align: center;
-            font-size: 1em;
-            font-weight: bold;
-            box-shadow: 0 0 10px rgba(155, 86, 255, 0.4);
-            transition: transform 0.2s, box-shadow 0.2s;
-            border: 2px solid var(--secondary-color);
-        }
-        .game-item:hover {
-            transform: scale(1.05);
-            box-shadow: 0 0 20px var(--accent-color);
-        }
-        .game-item span { display: block; font-size: 2.5em; margin-bottom: 5px; }
-        @media (max-width: 400px) {
-            .game-menu { grid-template-columns: repeat(2, 1fr); }
-            h1 { font-size: 1.5em; }
+            font-size: 2em;
         }
     </style>
 </head>
 <body>
-    <h1>Выберите игру Казино РЖДК</h1>
-    <div class="game-menu">
-        <a href="slots.html" class="game-item"><span>🎰</span> Слоты 3x3</a>
-        <a href="roulette.html" class="game-item"><span>🔴⚫</span> Рулетка</a>
-        <a href="aviator.html" class="game-item"><span>✈️</span> Авиатор</a>
-        <a href="coin.html" class="game-item"><span>🪙</span> Монетка</a>
-        <a href="mines.html" class="game-item"><span>💣</span> Сапёр</a>
-        <a href="hilo.html" class="game-item"><span>🎚️</span> Больше/Меньше</a>
-        <a href="keno.html" class="game-item"><span>🎱</span> Кено</a>
-        <a href="poker.html" class="game-item"><span>🃏</span> Покер</a>
-        <a href="blackjack.html" class="game-item"><span>2️⃣1️⃣</span> Блэкджек</a>
+    <h1>ВЫБЕРИТЕ ИГРУ</h1>
+    <div class="casino-wrapper">
+        <div class="game-menu">
+            <a href="slots.html" class="game-item"><span>🎰</span> Слоты 3x3</a>
+            <a href="roulette.html" class="game-item"><span>🔴⚫</span> Рулетка</a>
+            <a href="aviator.html" class="game-item"><span>✈️</span> Авиатор</a>
+            <a href="coin.html" class="game-item"><span>🪙</span> Монетка</a>
+            <a href="hilo.html" class="game-item"><span>⬆️⬇️</span> Больше/Меньше</a>
+            
+            <!-- ОНЛАЙН ИГРЫ С КОМНАТАМИ -->
+            <a href="blackjack.html" class="game-item" style="border-color: var(--neon-pink); box-shadow: var(--shadow-pink);"><span>🃏</span> **Блэкджек (Online)**</a>
+            <a href="poker.html" class="game-item" style="border-color: var(--neon-pink); box-shadow: var(--shadow-pink);"><span>♠️</span> **Покер (Online)**</a>
+            
+            <a href="mines.html" class="game-item"><span>💣</span> Сапёр (Mines)</a>
+            <a href="keno.html" class="game-item"><span>🔢</span> Кено</a>
+        </div>
     </div>
 </body>
 </html>

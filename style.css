@@ -1,0 +1,200 @@
+/* public/style.css (НОВЫЙ НЕОНОВЫЙ СТИЛЬ) */
+
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap');
+
+:root {
+    --neon-bg: #03040a;
+    --neon-metal: #1A1A33; 
+    --neon-blue: #00ffff;
+    --neon-pink: #ff00ff;
+    --neon-green: #00ff00;
+    --neon-red: #ff4757;
+    --neon-text: #e6f7ff;
+    --main-font: 'Orbitron', sans-serif;
+    
+    --shadow-blue: 0 0 5px var(--neon-blue), 0 0 10px var(--neon-blue), 0 0 15px var(--neon-blue);
+    --shadow-pink: 0 0 5px var(--neon-pink), 0 0 10px var(--neon-pink);
+    --shadow-green: 0 0 5px var(--neon-green), 0 0 10px var(--neon-green);
+    --shadow-red: 0 0 5px var(--neon-red), 0 0 10px var(--neon-red);
+}
+
+body {
+    background-color: var(--neon-bg);
+    color: var(--neon-text);
+    font-family: var(--main-font);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    min-height: 100vh;
+    margin: 0;
+    padding: 10px;
+    box-sizing: border-box;
+    overflow-x: hidden;
+}
+
+/* --- ОБЩИЕ ЭЛЕМЕНТЫ --- */
+.casino-wrapper {
+    width: 100%;
+    max-width: 500px;
+    padding: 10px 0;
+    box-sizing: border-box;
+}
+
+.game-container, .neon-window {
+    width: 100%;
+    padding: 15px;
+    border-radius: 10px;
+    background: var(--neon-metal);
+    box-shadow: var(--shadow-pink);
+    border: 2px solid var(--neon-pink);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 15px;
+    box-sizing: border-box;
+}
+
+.header-controls {
+    display: flex;
+    gap: 15px;
+    align-items: center;
+    width: 100%;
+    justify-content: space-around;
+}
+
+.display { 
+    font-size: 1.1em; 
+    font-weight: 700; 
+    color: var(--neon-green); 
+    padding: 8px 15px; 
+    border-radius: 5px; 
+    border: 1px dashed var(--neon-green);
+    box-shadow: var(--shadow-green);
+    background: #000;
+    text-shadow: var(--shadow-green);
+}
+
+.bet-input-group, .bet-input {
+    width: 100px; 
+    padding: 10px; 
+    border-radius: 5px; 
+    border: 2px solid var(--neon-blue); 
+    background-color: var(--neon-bg); 
+    color: var(--neon-text); 
+    text-align: center;
+    font-family: var(--main-font);
+    font-size: 1.1em;
+    box-shadow: var(--shadow-blue);
+}
+
+.main-button, .neon-btn { 
+    padding: 12px 25px; 
+    font-size: 1.2em; 
+    font-weight: 800; 
+    border: none; 
+    border-radius: 5px; 
+    cursor: pointer; 
+    background: var(--neon-pink); 
+    color: var(--neon-bg); 
+    box-shadow: var(--shadow-pink); 
+    transition: all 0.2s ease; 
+    text-transform: uppercase; 
+    width: 100%;
+    box-sizing: border-box;
+}
+.main-button:hover:not(:disabled) { 
+    transform: scale(1.02); 
+    box-shadow: 0 0 25px var(--neon-pink); 
+}
+.main-button:disabled { 
+    background: #444; 
+    color: #888;
+    box-shadow: none; 
+    cursor: not-allowed; 
+    opacity: 0.6; 
+}
+
+/* --- СТИЛИ ДЛЯ INDEX (Лобби) --- */
+.game-menu {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 15px;
+    width: 100%;
+}
+.game-item {
+    text-decoration: none;
+    color: var(--neon-text);
+    background-color: var(--neon-metal);
+    padding: 15px 10px;
+    border-radius: 10px;
+    text-align: center;
+    font-size: 1em;
+    font-weight: bold;
+    box-shadow: var(--shadow-blue);
+    transition: transform 0.2s, box-shadow 0.2s;
+    border: 2px solid var(--neon-blue);
+}
+.game-item:hover {
+    transform: scale(1.05);
+    box-shadow: 0 0 20px var(--neon-blue);
+}
+.game-item span { display: block; font-size: 2.5em; margin-bottom: 5px; }
+
+/* --- СТИЛИ ДЛЯ БЛЭКДЖЕКА/ПОКЕРА --- */
+.hand-container { 
+    text-align: center; 
+    min-height: 75px; 
+    margin-bottom: 10px;
+    display: flex; 
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 5px;
+    width: 100%;
+    background: rgba(0,0,0,0.3);
+    border-radius: 5px;
+    padding: 5px;
+    border: 1px dashed var(--neon-blue);
+}
+.card-container { display: inline-block; }
+.card { 
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    align-items: center;
+    width: 50px; 
+    height: 75px; 
+    font-size: 1em;
+    background-color: #f0f0f0; 
+    border: 1px solid #777; 
+    border-radius: 6px; 
+    box-shadow: 1px 1px 3px rgba(0, 0, 0, 0.5); 
+    text-align: center;
+    font-weight: 700;
+    color: #1e272e;
+    padding: 2px 0;
+    box-sizing: border-box;
+}
+.red-suit { color: var(--neon-red); }
+.card-suit-symbol { font-size: 1.3em; line-height: 1; }
+.card-back { 
+    background-color: var(--neon-metal); 
+    border: 3px solid var(--neon-pink); 
+    color: var(--neon-pink); 
+    font-size: 1.5em; 
+    display: flex; 
+    justify-content: center; 
+    align-items: center; 
+}
+
+/* Стили для лобби (Список комнат) */
+.table-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px;
+    border: 1px solid var(--neon-blue);
+    border-radius: 8px;
+    background: rgba(0, 255, 255, 0.1);
+}
+.table-item span { font-weight: bold; }

@@ -23,7 +23,10 @@
 
         <div id="lobbyView" style="width: 100%; display: flex; flex-direction: column; align-items: center; gap: 10px;">
             <div style="display: flex; gap: 10px; width: 100%; max-width: 400px; justify-content: center;">
-                <button class="main-button" id="createTableBtn">Создать Стол</button>
+                 <button class="main-button" id="quickPlayBtn" style="background: var(--neon-green);">🚀 Быстрая Игра</button>
+            </div>
+            <div style="display: flex; gap: 10px; width: 100%; max-width: 400px; justify-content: center;">
+                <button class="main-button" id="createTableBtn">...или Создать Свой Стол</button>
             </div>
             <div id="createTableForm" class="form-panel" style="display: none; width: 100%; max-width: 400px;">
                  <h2>Создание стола</h2>
@@ -51,15 +54,15 @@
             <div id="playersContainer" style="margin-top: 15px; width: 100%;">
                 </div>
 
-            <div class="controls-panel">
-                <div class="bet-controls">
-                    <input type="number" id="betAmountInput" placeholder="Ставка" value="10" min="10" style="width: 100px;">
-                    <button class="main-button" id="placeBetBtn">Сделать ставку</button>
-                    <button class="main-button" id="startGameBtn" style="background: var(--neon-green); display: none;">Начать игру</button>
+            <div class="controls-panel" style="width: 100%; margin-top: 15px;">
+                <div class="bet-controls" id="betControls" style="display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; width: 100%;">
+                    <input type="number" id="betAmountInput" placeholder="Ставка" value="10" min="10" class="bet-input" style="width: 100px; flex-shrink: 0;">
+                    <button class="main-button" id="placeBetBtn" style="flex-grow: 1;">Сделать ставку</button>
+                    <button class="main-button" id="startGameBtn" style="background: var(--neon-green); display: none; flex-grow: 1;">Начать игру</button>
                 </div>
-                <div class="game-actions" style="margin-top: 10px;">
-                    <button class="main-button" id="hitBtn" disabled>Взять еще (Hit)</button>
-                    <button class="main-button" id="standBtn" disabled>Хватит (Stand)</button>
+                <div class="game-actions" id="gameActions" style="display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; width: 100%; margin-top: 10px;">
+                    <button class="main-button" id="hitBtn" disabled style="flex-grow: 1;">Взять еще (Hit)</button>
+                    <button class="main-button" id="standBtn" disabled style="flex-grow: 1;">Хватит (Stand)</button>
                 </div>
             </div>
         </div>
@@ -90,9 +93,10 @@
     const maxPlayersInput = document.getElementById('maxPlayersInput');
     const minBetInput = document.getElementById('minBetInput');
     const createTableForm = document.getElementById('createTableForm');
-    
-    // НОВОЕ: Кнопка Начать игру
     const startGameBtn = document.getElementById('startGameBtn');
+    
+    // НОВЫЙ ЭЛЕМЕНТ
+    const quickPlayBtn = document.getElementById('quickPlayBtn');
 
 
     // --- УТИЛИТЫ КЛИЕНТА ---
@@ -104,18 +108,26 @@
     function showLobby() {
         tableView.style.display = 'none';
         lobbyView.style.display = 'flex';
-        // Сброс кнопок ставок
+        // Сброс кнопок
         placeBetBtn.disabled = false;
         placeBetBtn.textContent = 'Сделать ставку';
-        startGameBtn.style.display = 'none'; // Скрываем кнопку при выходе
+        startGameBtn.style.display = 'none';
         hitBtn.disabled = true;
         standBtn.disabled = true;
+        
+        // НОВОЕ: Сброс кнопки быстрой игры
+        quickPlayBtn.disabled = false;
+        quickPlayBtn.textContent = '🚀 Быстрая Игра';
     }
 
     function showTable() {
         lobbyView.style.display = 'none';
         tableView.style.display = 'flex';
         createTableForm.style.display = 'none';
+        
+        // НОВОЕ: Сброс кнопки быстрой игры
+        quickPlayBtn.disabled = false;
+        quickPlayBtn.textContent = '🚀 Быстрая Игра';
     }
 
     function renderCard(cardStr) {
@@ -123,8 +135,9 @@
         const rank = cardStr.slice(0, -1);
         const suit = cardStr.slice(-1);
         const suitSymbol = suit === 'H' ? '♥' : suit === 'D' ? '♦' : suit === 'C' ? '♣' : '♠';
-        const color = (suit === 'H' || suit === 'D') ? 'card-suit-red' : 'card-suit-black';
-        return `<div class="card ${color}">${rank}<br>${suitSymbol}</div>`;
+        const color = (suit === 'H' || suit === 'D') ? 'red-suit' : ''; // CSS класс из style.css
+        // Используем классы из style.css для рендера карт
+        return `<div class="card"><span class="${color}">${rank}</span><span class="card-suit-symbol ${color}">${suitSymbol}</span></div>`;
     }
     
     // --- ОБРАБОТЧИКИ СОКЕТОВ ---
@@ -141,34 +154,28 @@
     });
 
     socket.on('table_list', (tables) => {
-        // КЛЮЧЕВОЕ ИСПРАВЛЕНИЕ: Функция, которая предотвращает NaN и правильно отображает статус
         renderTableList(tables.filter(t => t.gameType === 'Blackjack'));
     });
 
-    /**
-     * ИСПРАВЛЕНИЕ NaN и СТАТУСА:
-     */
     function renderTableList(tables) {
         lobbyTables.innerHTML = '';
-        
         tables.sort((a, b) => (a.isPrivate === b.isPrivate ? 0 : a.isPrivate ? 1 : -1));
 
         tables.forEach(table => {
             const playersCount = parseInt(table.currentPlayers) || 0; 
             const maxPlayers = parseInt(table.maxPlayers) || 0;
-            
-            // ИСПРАВЛЕНИЕ NaN: Гарантируем, что число игроков к ожиданию не меньше 0
             const neededPlayers = Math.max(0, maxPlayers - playersCount); 
 
-            // ИСПРАВЛЕНИЕ СТАТУСА
             let tableStatus;
             if (table.state === 'PLAYER_TURN' || table.state === 'DEALER_TURN' || table.state === 'RESULTS') {
                 tableStatus = 'Игра идет';
                 if (playersCount === maxPlayers) tableStatus = 'Игра идет (Полный)';
-            } else if (table.state === 'READY_TO_START') { // НОВЫЙ СТАТУС
+            } else if (table.state === 'READY_TO_START') {
                 tableStatus = 'Готов к старту';
             } else if (table.state === 'WAITING_FOR_BETS') {
                 tableStatus = 'Ожидание ставок';
+            } else if (playersCount === maxPlayers) {
+                tableStatus = 'Полный'; // Добавлено
             } else if (table.isPrivate) {
                 tableStatus = `Приватная (нужно ${neededPlayers} игрока)`;
             } else {
@@ -178,8 +185,9 @@
             const icon = '🃏';
             const lock = table.isPrivate ? ' 🔒' : '';
 
+            // ИСПРАВЛЕНО: onclick передает table.isPrivate как boolean
             const html = `
-                <div class="table-item" onclick="joinTable('${table.id}', '${table.isPrivate ? 'private' : 'public'}')">
+                <div class="table-item" onclick="joinTable('${table.id}', ${table.isPrivate})">
                     ${icon} Стол: ${table.id}${lock} (${playersCount}/${maxPlayers})
                     <br>Мин. ставка: ${table.minBet} | Статус: <strong>${tableStatus}</strong>
                 </div>
@@ -197,23 +205,19 @@
     });
 
     socket.on('table_state', (tableState) => {
-        let myPlayer = tableState.players.find(p => p.id === myPlayerId);
+        // (Логика обновления стола ...)
         
-        // 1. Обновление состояния дилера
+        // 1. Дилер
         const dealerHandElement = document.getElementById('dealerHand');
         dealerHandElement.innerHTML = '';
         const isGameStarted = tableState.state !== 'WAITING_FOR_BETS' && tableState.state !== 'WAITING_FOR_PLAYERS' && tableState.state !== 'READY_TO_START';
-
         tableState.dealerHand.forEach((card, index) => {
-            // Если игра идет, и это первая карта (индекс 0), показываем рубашку
             if (isGameStarted && index === 0 && tableState.state === 'PLAYER_TURN') {
-                dealerHandElement.innerHTML += renderCard(null); // Карта рубашкой
+                dealerHandElement.innerHTML += renderCard(null); // Рубашка
             } else {
                 dealerHandElement.innerHTML += renderCard(card);
             }
         });
-        
-        // Показываем счет дилера только когда его ход или когда результаты
         const dealerScoreElement = document.getElementById('dealerScore');
         if (tableState.state === 'DEALER_TURN' || tableState.state === 'RESULTS') {
             dealerScoreElement.textContent = tableState.dealerScore;
@@ -221,13 +225,10 @@
             dealerScoreElement.textContent = '?';
         }
 
-        // 2. Обновление состояния игроков
+        // 2. Игроки
         playersContainer.innerHTML = '';
-        let allActivePlayersBet = true; // Флаг для кнопки старта
-
         tableState.players.forEach(p => {
             const isMe = p.id === myPlayerId;
-            const isActive = p.active;
             const isMyTurn = p.id === tableState.activePlayerId;
             const classList = ['player-panel'];
             if (isMe) classList.push('my-player');
@@ -235,50 +236,39 @@
 
             const playerHtml = `
                 <div id="player-${p.id}" class="${classList.join(' ')}" style="border-color: ${isMe ? 'var(--neon-green)' : 'var(--neon-text)'};">
-                    <div class="player-info">${p.username} ${isMe ? '(Вы)' : ''} | Счет: <span id="score-${p.id}">${(isActive && tableState.state !== 'WAITING_FOR_BETS' && tableState.state !== 'READY_TO_START') ? p.score : '?'}</span> | Ставка: ${p.bet}</div>
+                    <div class="player-info">${p.username} ${isMe ? '(Вы)' : ''} | Счет: <span id="score-${p.id}">${(p.active && isGameStarted) ? p.score : '?'}</span> | Ставка: ${p.bet}</div>
                     <div class="hand-container">${p.hand.map(card => renderCard(card)).join('')}</div>
                 </div>
             `;
             playersContainer.innerHTML += playerHtml;
             
-            // Проверка, все ли активные игроки сделали ставку
-            if (p.active && p.bet === 0) {
-                 allActivePlayersBet = false;
-            }
-            
-            // Управление кнопками
             if (isMe) {
                  hitBtn.disabled = !isMyTurn;
                  standBtn.disabled = !isMyTurn;
-                 
-                 // ИСПРАВЛЕНИЕ: Управление кнопкой Place Bet
-                 // Кнопка доступна, только если WAITING_FOR_BETS и ставка не сделана
                  const canBet = tableState.state === 'WAITING_FOR_BETS' && p.bet === 0;
                  placeBetBtn.disabled = !canBet;
                  placeBetBtn.textContent = p.bet > 0 ? `Ставка: ${p.bet}` : 'Сделать ставку';
             }
         });
         
-        // 3. Управление кнопкой "Начать игру"
+        // 3. Кнопка "Начать игру"
         const showStartButton = tableState.state === 'READY_TO_START';
-        // Показываем кнопку только в режимах ставок/готовности
         startGameBtn.style.display = (tableState.state === 'WAITING_FOR_BETS' || tableState.state === 'READY_TO_START') ? 'inline-block' : 'none';
         startGameBtn.disabled = !showStartButton;
         startGameBtn.textContent = showStartButton ? 'Начать игру' : 'Ожидание ставок...';
         
-        // 4. Обновление общего сообщения
+        // 4. Общее сообщение
         if (tableState.state === 'WAITING_FOR_BETS') {
-             updateDisplay('Сделайте вашу ставку, чтобы начать игру.');
+             updateDisplay('Сделайте вашу ставку.');
         } else if (tableState.state === 'READY_TO_START') {
-             updateDisplay('Все ставки сделаны. Любой игрок может нажать "Начать игру".');
+             updateDisplay('Все ставки сделаны. Нажмите "Начать игру".');
         } else if (tableState.state === 'PLAYER_TURN') {
              const activePlayer = tableState.players.find(p => p.id === tableState.activePlayerId);
              updateDisplay(`Ход игрока: ${activePlayer.username}.`);
         } else if (tableState.state === 'DEALER_TURN') {
              updateDisplay('Ход Дилера...');
         } else if (tableState.state === 'RESULTS') {
-             updateDisplay('Раунд завершен. Ожидание нового раунда ставок.');
-             // На этом этапе GameServerLogic переключит на WAITING_FOR_BETS через 3 секунды
+             updateDisplay('Раунд завершен. Ожидание нового раунда.');
         }
     });
     
@@ -286,22 +276,36 @@
         currentTableId = null;
         renderTableList(data.tables);
         showLobby();
-        messageDisplay.textContent = 'Вы вышли из-за стола. Выберите новый стол.';
+        messageDisplay.textContent = 'Вы вышли из-за стола.';
+    });
+
+    // НОВОЕ: Обработка статуса быстрой игры
+    socket.on('quick_play_pending', (msg) => {
+        messageDisplay.textContent = msg;
+        quickPlayBtn.disabled = true;
+        quickPlayBtn.textContent = 'Поиск...';
     });
 
     socket.on('error_message', (msg) => {
         alert(`Ошибка: ${msg}`);
-        // В случае ошибки возвращаем кнопки в рабочее состояние
-        if (placeBetBtn.textContent === 'Ожидание...') {
-             placeBetBtn.disabled = false;
-             placeBetBtn.textContent = 'Сделать ставку';
-        }
+        // Сброс кнопок
+        placeBetBtn.disabled = false;
+        placeBetBtn.textContent = 'Сделать ставку';
         hitBtn.disabled = false;
         standBtn.disabled = false;
+        quickPlayBtn.disabled = false;
+        quickPlayBtn.textContent = '🚀 Быстрая Игра';
         messageDisplay.textContent = `❌ Ошибка: ${msg}`;
     });
 
     // --- ОБРАБОТЧИКИ КНОПОК ---
+
+    // НОВОЕ: Кнопка быстрой игры
+    quickPlayBtn.onclick = () => {
+        quickPlayBtn.disabled = true;
+        quickPlayBtn.textContent = 'Поиск...';
+        socket.emit('quick_play', { gameType: 'Blackjack' });
+    };
 
     createTableBtn.onclick = () => { createTableForm.style.display = 'flex'; };
     
@@ -311,7 +315,7 @@
         
         const isPrivate = confirm("Сделать комнату приватной (с паролем)?");
         let password = null;
-        if (isPrivate) password = prompt("Введите пароль (или оставьте пустым):");
+        if (isPrivate) password = prompt("Введите пароль:");
         
         if (maxPlayers >= 2 && minBet >= 1) {
             socket.emit('create_table', { gameType: 'Blackjack', maxPlayers, minBet, isPrivate, password });
@@ -321,23 +325,32 @@
         }
     };
     
-    function joinTable(tableId) { 
-        socket.emit('join_table', { tableId: tableId, wantsBots: true }); 
+    // ИСПРАВЛЕНО: Функция принимает isPrivate
+    function joinTable(tableId, isPrivate) { 
+        let password = null;
+        if (isPrivate) {
+            password = prompt("Это приватный стол. Введите пароль:");
+            if (password === null) return; // Пользователь нажал "Отмена"
+        }
+        
+        socket.emit('join_table', { 
+            tableId: tableId, 
+            wantsBots: true, // (оставлено)
+            password: password // НОВОЕ ПОЛЕ
+        }); 
     }
     
     placeBetBtn.onclick = () => {
         const amount = parseInt(betAmountInput.value);
         if (amount >= 10 && amount <= balance) { 
-            // Отключаем кнопку до ответа сервера
             placeBetBtn.disabled = true;
-            placeBetBtn.textContent = 'Ожидание...'; // Это тот самый текст, который нужно исправить
+            placeBetBtn.textContent = 'Ожидание...';
             socket.emit('place_bet', { tableId: currentTableId, amount: amount }); 
         } else {
              alert('Неверная сумма ставки или недостаточно средств.');
         }
     };
     
-    // НОВОЕ: Обработчик для кнопки "Начать игру"
     startGameBtn.onclick = () => {
         startGameBtn.disabled = true;
         socket.emit('start_game_command', { tableId: currentTableId });
@@ -359,11 +372,6 @@
         if (confirm("Вы уверены, что хотите покинуть стол?")) { 
             socket.emit('leave_table'); 
         } 
-    };
-
-    // --- Инициализация ---
-    window.onload = () => {
-        // ... (логика загрузки баланса и т.п.)
     };
 </script>
 

@@ -2,11 +2,9 @@
 
 const { v4: uuidv4 } = require('uuid');
 
-// --- УТИЛИТЫ КАРТ ---
-// (Код Deck и calculateScore остается без изменений)
+// --- УТИЛИТЫ КАРТ (без изменений) ---
 const cardRanks = ['2', '3', '4', '5', '6', '7', '8', '9', 'T', 'J', 'Q', 'K', 'A'];
 const cardSuits = ['C', 'D', 'H', 'S'];
-
 function calculateScore(hand) {
     let score = 0;
     let aces = 0;
@@ -27,7 +25,6 @@ function calculateScore(hand) {
     }
     return score;
 }
-
 class Deck {
     constructor() { this.cards = []; this.reset(); }
     reset() {
@@ -56,24 +53,23 @@ class Deck {
 class GameServerLogic {
     constructor(io) {
         this.io = io;
-        this.players = {}; // Состояние игроков
+        this.players = {};
         this.tables = {
             'T1': { id: 'T1', gameType: 'Blackjack', currentPlayers: 0, maxPlayers: 2, minBet: 10, isPrivate: false, state: 'WAITING_FOR_PLAYERS', players: [], deck: new Deck(), dealerHand: [] },
             'T2': { id: 'T2', gameType: 'Blackjack', currentPlayers: 0, maxPlayers: 6, minBet: 20, isPrivate: false, state: 'WAITING_FOR_PLAYERS', players: [], deck: new Deck(), dealerHand: [] },
-            'P1': { id: 'P1', gameType: 'Poker', currentPlayers: 0, maxPlayers: 4, minBet: 50, isPrivate: false, state: 'WAITING_FOR_PLAYERS', players: [], deck: new Deck(), dealerHand: [] }
+            'P1': { id: 'P1', gameType: 'Poker', currentPlayers: 0, maxPlayers: 4, minBet: 50, isPrivate: false, state: 'WAITING_FOR_PLAYERS', players: [], deck: new Deck(), dealerHand: [], communityCards: [], pot: 0, currentBet: 0 } // Добавил поля Покера
         };
         
-        // НОВОЕ: Очередь быстрой игры (матчмейкинг)
         this.quickPlayPool = {
-            'Blackjack': [], // [{socket, player, timestamp}, ...]
+            'Blackjack': [],
             'Poker': []
         };
 
-        this.startTableLoop(); // Запуск цикла обновления столов
-        this.startMatchmakingLoop(); // НОВЫЙ: Запуск цикла матчмейкинга
+        this.startTableLoop();
+        this.startMatchmakingLoop();
     }
     
-    // --- УПРАВЛЕНИЕ ЛОББИ И ПОЛЬЗОВАТЕЛЯМИ ---
+    // --- УПРАВЛЕНИЕ ЛОББИ И ПОЛЬЗОВАТЕЛЯМИ (без изменений) ---
     
     handleAuth(socket) {
         let player = this.players[socket.id];
@@ -118,19 +114,25 @@ class GameServerLogic {
             currentPlayers: 0,
             maxPlayers: data.maxPlayers,
             minBet: data.minBet,
-            isPrivate: data.isPrivate, // ИСПРАВЛЕНО: Теперь используется
-            password: data.password || null, // ИСПРАВЛЕНО: Теперь используется
+            isPrivate: data.isPrivate,
+            password: data.password || null,
             state: 'WAITING_FOR_PLAYERS',
             players: [],
             deck: new Deck(),
-            dealerHand: []
+            dealerHand: [] // Для Блэкджека
         };
+        
+        if (data.gameType === 'Poker') {
+            newTable.communityCards = [];
+            newTable.pot = 0;
+            newTable.currentBet = 0;
+        }
+        
         this.tables[newTableId] = newTable;
-        // Владелец сразу присоединяется (пароль не нужен, т.к. он создатель)
         this.joinTable(socket, newTableId, false, null, true); 
     }
 
-    // ИСПРАВЛЕНО: Добавлен 'password' и 'isCreator'
+    // ИЗМЕНЕНО: Добавлена логика для Покера (state)
     joinTable(socket, tableId, wantsBots, password, isCreator = false) {
         const player = this.players[socket.id];
         const table = this.tables[tableId];
@@ -139,28 +141,38 @@ class GameServerLogic {
             socket.emit('error_message', 'Стол не найден.');
             return;
         }
-
-        // НОВАЯ ПРОВЕРКА: Проверка пароля (создателю не нужно)
         if (!isCreator && table.isPrivate && table.password && table.password !== password) {
              socket.emit('error_message', 'Неверный пароль.');
              return;
         }
-        
         if (table.players.length >= table.maxPlayers) {
             socket.emit('error_message', 'Стол полон.');
             return;
         }
-        
         if (player.currentTableId) {
              this.leaveTable(socket);
         }
 
-        table.players.push({ id: player.id, username: player.username, bet: 0, hand: [], active: true }); 
+        // В Покере до-определяем поля
+        const playerState = { id: player.id, username: player.username, bet: 0, hand: [], active: true };
+        if (table.gameType === 'Poker') {
+             playerState.isFolded = false;
+             playerState.totalBet = 0;
+             playerState.currentBet = 0;
+        }
+        
+        table.players.push(playerState); 
         player.currentTableId = tableId;
         table.currentPlayers = table.players.length;
 
+        // 1. Установка статуса стола (Блэкджек)
         if (table.gameType === 'Blackjack' && (table.state === 'WAITING_FOR_PLAYERS' || table.state === 'RESULTS')) {
              table.state = 'WAITING_FOR_BETS';
+        }
+        
+        // 2. НОВОЕ: Установка статуса стола (Покер)
+        if (table.gameType === 'Poker' && table.state === 'WAITING_FOR_PLAYERS' && table.players.length >= 2) {
+             table.state = 'READY_TO_START_POKER';
         }
         
         socket.join(tableId);
@@ -170,6 +182,7 @@ class GameServerLogic {
         this.broadcastTableList();
     }
 
+    // ИЗМЕНЕНО: Добавлена логика для Покера (state)
     leaveTable(socket) {
         const player = this.players[socket.id];
         if (!player || !player.currentTableId) return;
@@ -177,12 +190,12 @@ class GameServerLogic {
         const tableId = player.currentTableId;
         const table = this.tables[tableId];
         
-        // (Логика возврата ставки...)
         const exitingPlayer = table.players.find(p => p.id === player.id);
-        if (exitingPlayer && exitingPlayer.bet > 0) {
+        if (exitingPlayer && exitingPlayer.bet > 0) { // Блэкджек
              player.balance += exitingPlayer.bet;
              socket.emit('auth_success', { id: player.id, balance: player.balance });
         }
+        // (Тут должна быть логика возврата ставок Покера, но пока пропускаем)
         
         table.players = table.players.filter(p => p.id !== player.id);
         table.currentPlayers = table.players.length;
@@ -190,11 +203,18 @@ class GameServerLogic {
         socket.leave(tableId);
         player.currentTableId = null;
         
+        // Обновляем состояние стола:
         if (table.players.length === 0) {
              table.state = 'WAITING_FOR_PLAYERS';
-        } else if (table.state === 'READY_TO_START') {
+        } else if (table.gameType === 'Blackjack' && table.state === 'READY_TO_START') {
             const allBetsIn = table.players.every(p => p.bet > 0);
             if (!allBetsIn) table.state = 'WAITING_FOR_BETS';
+        
+        // НОВОЕ: Проверка Покера
+        } else if (table.gameType === 'Poker' && (table.state === 'READY_TO_START_POKER' || table.state === 'PRE_FLOP')) {
+             if (table.players.length < 2) {
+                 table.state = 'WAITING_FOR_PLAYERS';
+             }
         }
         
         this.sendTableState(table); 
@@ -206,22 +226,49 @@ class GameServerLogic {
     // --- ЛОГИКА БЛЭКДЖЕКА ---
 
     sendTableState(table) {
+        // Базовое состояние
         const tableState = {
             id: table.id,
             state: table.state,
-            dealerHand: table.dealerHand,
-            dealerScore: calculateScore(table.dealerHand),
-            activePlayerId: table.activePlayerIndex !== undefined && table.activePlayerIndex !== -1 && table.players[table.activePlayerIndex]
-                               ? table.players[table.activePlayerIndex].id : null,
-            players: table.players.map(p => ({
+            players: [], // Будет заполнено ниже
+        };
+
+        // Специфичные поля для Блэкджека
+        if (table.gameType === 'Blackjack') {
+            tableState.dealerHand = table.dealerHand;
+            tableState.dealerScore = calculateScore(table.dealerHand);
+            tableState.activePlayerId = table.activePlayerIndex !== undefined && table.activePlayerIndex !== -1 && table.players[table.activePlayerIndex]
+                                       ? table.players[table.activePlayerIndex].id : null;
+            
+            tableState.players = table.players.map(p => ({
                 id: p.id,
                 username: p.username,
                 bet: p.bet,
                 hand: p.hand,
                 score: calculateScore(p.hand),
                 active: p.active
-            }))
-        };
+            }));
+        }
+
+        // Специфичные поля для Покера
+        if (table.gameType === 'Poker') {
+            tableState.communityCards = table.communityCards;
+            tableState.pot = table.pot;
+            tableState.currentBet = table.currentBet;
+            tableState.activePlayerId = table.activePlayerIndex !== undefined && table.activePlayerIndex !== -1 && table.players[table.activePlayerIndex]
+                                       ? table.players[table.activePlayerIndex].id : null;
+
+            tableState.players = table.players.map(p => ({
+                id: p.id,
+                username: p.username,
+                hand: p.hand,
+                active: p.active,
+                isFolded: p.isFolded,
+                totalBet: p.totalBet,
+                currentBet: p.currentBet
+            }));
+        }
+
         this.io.to(table.id).emit('table_state', tableState);
     }
     
@@ -250,22 +297,41 @@ class GameServerLogic {
         }
     }
     
+    // ИЗМЕНЕНО: Обрабатывает и Блэкджек, и Покер
     startGameCommand(socket, tableId) {
-        // (Логика startGameCommand ... )
+        const player = this.players[socket.id];
         const table = this.tables[tableId];
-        if (!table || table.gameType !== 'Blackjack') {
-             socket.emit('error_message', 'Стол не найден.'); return;
+
+        if (!table) {
+             socket.emit('error_message', 'Стол не найден.');
+             return;
         }
-        if (table.state === 'READY_TO_START') {
-             this.startGame(table);
-             this.sendTableState(table); 
-        } else {
-             socket.emit('error_message', 'Ожидаем ставки от всех игроков.');
+        
+        // Логика Блэкджека
+        if (table.gameType === 'Blackjack') {
+            if (table.state === 'READY_TO_START') {
+                 this.startGame(table);
+                 this.sendTableState(table); 
+            } else if (table.state === 'WAITING_FOR_BETS') {
+                 socket.emit('error_message', 'Ожидаем ставки от всех игроков.');
+            } else {
+                 socket.emit('error_message', 'Игра уже идет.');
+            }
+        }
+        
+        // НОВАЯ ЛОГИКА: Покер
+        if (table.gameType === 'Poker') {
+            if (table.state === 'READY_TO_START_POKER') {
+                 this.startPokerGame(table); // Новая функция
+                 this.sendTableState(table);
+            } else {
+                 socket.emit('error_message', 'Игра уже идет или ожидает игроков.');
+            }
         }
     }
     
+    // (Запуск Блэкджека)
     startGame(table) {
-        // (Логика startGame ...)
         if (table.gameType === 'Blackjack' && table.players.some(p => p.bet > 0)) {
             table.deck.reset(); 
             table.dealerHand = [];
@@ -287,15 +353,101 @@ class GameServerLogic {
         }
     }
     
-    // (Методы hit, stand, checkResults, dealerPlay... должны быть здесь)
+    /**
+     * НОВОЕ: Функция запуска игры Покер (Заглушка).
+     */
+    startPokerGame(table) {
+        if (table.gameType !== 'Poker' || table.players.length < 2) return;
+        
+        // Сброс и раздача (упрощенно)
+        table.deck.reset();
+        table.communityCards = [];
+        table.pot = 0;
+        table.currentBet = 0;
+        
+        table.players.forEach(p => {
+            p.hand = [table.deck.draw(), table.deck.draw()];
+            p.active = true;
+            p.isFolded = false;
+            p.totalBet = 0;
+            p.currentBet = 0;
+        });
 
+        // (Здесь должна быть сложная логика блайндов)
+        
+        // Начинаем ход первого активного игрока
+        table.activePlayerIndex = 0; // Упрощенно
+        table.state = 'PRE_FLOP'; // Двигаем состояние
+        
+        console.log(`[Poker] Game ${table.id} started. State: PRE_FLOP`);
+    }
+
+    
+    // (hit, stand... блэкджека)
+    // ...
+    
+    // --- НОВЫЕ СТАБЫ (ЗАГЛУШКИ) ДЛЯ ПОКЕРА ---
+    fold(socket) {
+        const player = this.players[socket.id];
+        if (!player || !player.currentTableId) return;
+        const table = this.tables[player.currentTableId];
+        
+        if (table && table.gameType === 'Poker') {
+            console.log(`[STUB] Player ${player.id} FOLDED`);
+            // (Здесь должна быть логика фолда)
+            // Упрощенно:
+            const tablePlayer = table.players.find(p => p.id === player.id);
+            if (tablePlayer) tablePlayer.isFolded = true;
+            
+            // (Тут должна быть логика передачи хода)
+            this.sendTableState(table);
+            socket.emit('error_message', 'Вы сделали Фолд (Логика Покера в разработке).');
+        }
+    }
+
+    callCheck(socket) {
+        const player = this.players[socket.id];
+        if (!player || !player.currentTableId) return;
+        const table = this.tables[player.currentTableId];
+        
+        if (table && table.gameType === 'Poker') {
+            console.log(`[STUB] Player ${player.id} CALL/CHECK`);
+            // (Здесь должна быть логика)
+            this.sendTableState(table);
+            socket.emit('error_message', 'Вы сделали Чек/Колл (Логика Покера в разработке).');
+        }
+    }
+
+    raise(socket, amount) {
+        const player = this.players[socket.id];
+        if (!player || !player.currentTableId) return;
+        const table = this.tables[player.currentTableId];
+
+        if (table && table.gameType === 'Poker') {
+            console.log(`[STUB] Player ${player.id} RAISED ${amount}`);
+            // (Здесь должна быть логика)
+            this.sendTableState(table);
+            socket.emit('error_message', `Вы сделали Рейз ${amount} (Логика Покера в разработке).`);
+        }
+    }
+    // --- КОНЕЦ СТАБОВ ДЛЯ ПОКЕРА ---
+
+
+    // ИЗМЕНЕНО: Добавлена проверка Покера
     handleDisconnect(socket) {
         const player = this.players[socket.id];
         if (player && player.currentTableId) {
-             this.leaveTable(socket); 
+             const tableId = player.currentTableId;
+             this.leaveTable(socket); // Выходим
+             
+             // Доп. проверка, если leaveTable не успел
+             const table = this.tables[tableId];
+             if (table && table.gameType === 'Poker' && table.players.length < 2 && (table.state === 'READY_TO_START_POKER' || table.state === 'PRE_FLOP')) {
+                  table.state = 'WAITING_FOR_PLAYERS';
+                  this.sendTableState(table);
+             }
         }
         
-        // НОВОЕ: Удаление из очередей матчмейкинга при дисконнекте
         Object.keys(this.quickPlayPool).forEach(gameType => {
             this.quickPlayPool[gameType] = this.quickPlayPool[gameType].filter(
                 p => p.socket.id !== socket.id
@@ -306,82 +458,61 @@ class GameServerLogic {
         this.broadcastTableList();
     }
     
-    // --- НОВАЯ ЛОГИКА: МАТЧМЕЙКИНГ (БЫСТРАЯ ИГРА) ---
+    // --- ЛОГИКА МАТЧМЕЙКИНГА (без изменений) ---
     
-    /**
-     * НОВОЕ: Вход в быструю игру.
-     */
     handleQuickPlay(socket, gameType) {
         const player = this.players[socket.id];
         if (!player || player.currentTableId) {
             socket.emit('error_message', 'Вы уже за столом.');
             return;
         }
-        
-        // Проверяем, не в очереди ли уже
         if (this.quickPlayPool[gameType].find(p => p.socket.id === socket.id)) {
              socket.emit('error_message', 'Вы уже в очереди.');
              return;
         }
-
         socket.emit('quick_play_pending', `Ищем игру (${gameType})...`);
-        
-        // Добавляем в очередь
         this.quickPlayPool[gameType].push({
             socket: socket,
             player: player,
             timestamp: Date.now()
         });
-        
-        // (Логика обработки очереди будет в startMatchmakingLoop)
     }
 
-    /**
-     * НОВОЕ: Цикл обработки матчмейкинга (каждые 5 сек).
-     */
     startMatchmakingLoop() {
         setInterval(() => {
             Object.keys(this.quickPlayPool).forEach(gameType => {
                 const pool = this.quickPlayPool[gameType];
                 if (pool.length === 0) return;
 
-                // 1. Попытка найти существующий публичный стол с местом
+                // 1. Попытка найти существующий стол
                 const availableTable = Object.values(this.tables).find(
                     t => t.gameType === gameType &&
-                         !t.isPrivate && // Только публичные
+                         !t.isPrivate &&
                          t.players.length < t.maxPlayers &&
                          (t.state === 'WAITING_FOR_PLAYERS' || t.state === 'WAITING_FOR_BETS')
                 );
 
                 if (availableTable) {
-                    // Нашли стол! Добавляем первого игрока из очереди
-                    const entry = pool.shift(); // Берем первого
+                    const entry = pool.shift();
                     if (entry) {
                          console.log(`[Matchmaking] ${entry.player.id} joining ${availableTable.id}`);
-                         this.joinTable(entry.socket, availableTable.id, false, null); // null = нет пароля
+                         this.joinTable(entry.socket, availableTable.id, false, null);
                     }
-                    return; // Обрабатываем по одному за тик
+                    return;
                 }
                 
-                // 2. Логика 30 секунд (как просил пользователь)
+                // 2. Логика 30 секунд
                 const now = Date.now();
-                const waitingOver30s = pool.filter(entry => (now - entry.timestamp) > 30000); // 30 сек
+                const waitingOver30s = pool.filter(entry => (now - entry.timestamp) > 30000);
                 const waitingUnder30s = pool.filter(entry => (now - entry.timestamp) <= 30000);
 
                 if (waitingOver30s.length > 0) {
-                    // Есть игроки, ждущие > 30 сек.
-                    // "запускается с одним или более игроками" -> Создаем для них стол.
-                    
                     let playersForNewTable = waitingOver30s;
-                    
                     let maxPlayers = (gameType === 'Blackjack') ? 4 : 6;
-                    
-                    // Берем тех, кто ждал > 30 сек, но не больше maxPlayers
                     if (playersForNewTable.length > maxPlayers) {
                         playersForNewTable = waitingOver30s.slice(0, maxPlayers);
                     }
                     
-                    // Обновляем пул (оставляем тех, кто < 30s и тех, кто не влез > 30s)
                     const remainingOver30s = waitingOver30s.slice(playersForNewTable.length);
                     this.quickPlayPool[gameType] = [...waitingUnder30s, ...remainingOver30s];
 
@@ -401,25 +532,25 @@ class GameServerLogic {
                         deck: new Deck(),
                         dealerHand: []
                     };
+                    if (gameType === 'Poker') {
+                         newTable.communityCards = []; newTable.pot = 0; newTable.currentBet = 0;
+                    }
                     this.tables[newTableId] = newTable;
                     this.broadcastTableList();
 
-                    // Присоединяем всех игроков к столу
                     playersForNewTable.forEach(entry => {
-                        this.joinTable(entry.socket, newTableId, false, null, true); // true = создатель (пропустит проверку пароля)
+                        this.joinTable(entry.socket, newTableId, false, null, true);
                     });
                 }
-                // Если игроки ждут < 30 сек, мы просто ждем (п.1 найдет им стол или п.2 создаст)
             });
-        }, 5000); // Проверяем каждые 5 секунд
+        }, 5000);
     }
     
-    // --- ПАКЕТНЫЙ ЦИКЛ ОБНОВЛЕНИЯ (GAME LOOP) ---
+    // --- GAME LOOP (без изменений) ---
     startTableLoop() {
         setInterval(() => {
             Object.values(this.tables).forEach(table => {
                 if (table.gameType === 'Blackjack' && table.state === 'RESULTS') {
-                    // (Логика сброса раунда...)
                     table.state = 'WAITING_FOR_BETS';
                     table.dealerHand = [];
                     table.players.forEach(p => {

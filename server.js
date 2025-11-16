@@ -25,7 +25,6 @@ io.on('connection', (socket) => {
         gameServer.handleAuth(socket);
     });
 
-    // ИЗМЕНЕНО: Добавлена передача data.password
     socket.on('join_table', (data) => {
         gameServer.joinTable(socket, data.tableId, data.wantsBots, data.password);
     });
@@ -38,7 +37,6 @@ io.on('connection', (socket) => {
         gameServer.createTable(socket, data);
     });
     
-    // НОВОЕ: Обработчик для быстрой игры
     socket.on('quick_play', (data) => {
         gameServer.handleQuickPlay(socket, data.gameType);
     });
@@ -48,6 +46,7 @@ io.on('connection', (socket) => {
         gameServer.placeBet(socket, data.tableId, data.amount);
     });
     
+    // (Используется и Блэкджеком, и Покером)
     socket.on('start_game_command', (data) => {
         gameServer.startGameCommand(socket, data.tableId);
     });
@@ -59,6 +58,20 @@ io.on('connection', (socket) => {
     socket.on('stand', (data) => {
         gameServer.stand(socket, data.tableId);
     });
+    
+    // НОВОЕ: Покер действия (вызов заглушек)
+    socket.on('fold', () => {
+        gameServer.fold(socket);
+    });
+    
+    socket.on('call_check', () => {
+        gameServer.callCheck(socket);
+    });
+
+    socket.on('raise', (data) => {
+        gameServer.raise(socket, data.amount);
+    });
+
 
     // Обработка отключения
     socket.on('disconnect', () => {

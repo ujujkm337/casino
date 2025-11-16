@@ -1,4 +1,4 @@
-// server.js (Полный код с ИЗМЕНЕНИЯМИ)
+// server.js (Полный исправленный код)
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
@@ -25,7 +25,9 @@ io.on('connection', (socket) => {
         gameServer.handleAuth(socket);
     });
 
+    // Действия в лобби
     socket.on('join_table', (data) => {
+        // Добавлена передача пароля
         gameServer.joinTable(socket, data.tableId, data.wantsBots, data.password);
     });
     
@@ -37,6 +39,7 @@ io.on('connection', (socket) => {
         gameServer.createTable(socket, data);
     });
     
+    // НОВОЕ: Быстрая игра
     socket.on('quick_play', (data) => {
         gameServer.handleQuickPlay(socket, data.gameType);
     });
@@ -46,7 +49,6 @@ io.on('connection', (socket) => {
         gameServer.placeBet(socket, data.tableId, data.amount);
     });
     
-    // (Используется и Блэкджеком, и Покером)
     socket.on('start_game_command', (data) => {
         gameServer.startGameCommand(socket, data.tableId);
     });
@@ -59,27 +61,24 @@ io.on('connection', (socket) => {
         gameServer.stand(socket, data.tableId);
     });
     
-    // НОВОЕ: Покер действия (вызов заглушек)
+    // Покер действия (заглушки)
     socket.on('fold', () => {
         gameServer.fold(socket);
     });
     
     socket.on('call_check', () => {
-        gameServer.callCheck(socket);
+        gameServer.call_check(socket);
     });
-
-    socket.on('raise', (data) => {
-        gameServer.raise(socket, data.amount);
+    
+    socket.on('raise', () => {
+        gameServer.raise(socket);
     });
-
-
-    // Обработка отключения
+    
     socket.on('disconnect', () => {
-        console.log(`User disconnected: ${socket.id}`);
         gameServer.handleDisconnect(socket);
     });
 });
 
 server.listen(port, () => {
-    console.log(`Server running at http://localhost:${port}`);
+    console.log(`Server running on port ${port}`);
 });

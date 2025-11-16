@@ -108,7 +108,6 @@
     function showLobby() {
         tableView.style.display = 'none';
         lobbyView.style.display = 'flex';
-        // Сброс кнопок ставок
         placeBetBtn.disabled = false;
         placeBetBtn.textContent = 'Сделать ставку';
         startGameBtn.style.display = 'none';
@@ -130,6 +129,29 @@
         const suitSymbol = suit === 'H' ? '♥' : suit === 'D' ? '♦' : suit === 'C' ? '♣' : '♠';
         const color = (suit === 'H' || suit === 'D') ? 'card-suit-red' : 'card-suit-black';
         return `<div class="card ${color}">${rank}<br>${suitSymbol}</div>`;
+    }
+    
+    function calculateScore(hand) {
+        if (!hand) return 0;
+        let score = 0;
+        let aces = 0;
+        hand.forEach(cardStr => {
+            if (cardStr === null) return; 
+            const rank = cardStr.slice(0, -1);
+            if (rank === 'A') {
+                aces++;
+                score += 11;
+            } else if (['K', 'Q', 'J', 'T'].includes(rank)) {
+                score += 10;
+            } else {
+                score += parseInt(rank);
+            }
+        });
+        while (score > 21 && aces > 0) {
+            score -= 10;
+            aces--;
+        }
+        return score;
     }
     
     // --- ОБРАБОТЧИКИ СОКЕТОВ ---
@@ -192,28 +214,14 @@
     socket.on('table_state', (tableState) => {
         let myPlayer = tableState.players.find(p => p.id === myPlayerId);
 
-        // 1. Обновление состояния дилера (без изменений)
+        // 1. Обновление состояния дилера 
         const dealerHandElement = document.getElementById('dealerHand');
         const dealerScoreElement = document.getElementById('dealerScore');
         
-        dealerHandElement.innerHTML = '';
-        if (tableState.dealerHand.length > 0) {
-            const isGameActive = tableState.state === 'PLAYER_TURN' || tableState.state === 'DEALER_TURN';
-            dealerHandElement.innerHTML += renderCard(tableState.dealerHand[0]);
-            
-            if (tableState.dealerHand.length > 1) {
-                 dealerHandElement.innerHTML += isGameActive ? renderCard(null) : renderCard(tableState.dealerHand[1]);
-            }
-            dealerScoreElement.textContent = isGameActive ? calculateScore([tableState.dealerHand[0]]) : tableState.dealerScore;
-            
-            if (tableState.state === 'RESULTS' || tableState.state === 'DEALER_TURN') {
-                dealerHandElement.innerHTML = tableState.dealerHand.map(renderCard).join('');
-                dealerScoreElement.textContent = tableState.dealerScore;
-            }
-        }
-        
+        dealerHandElement.innerHTML = tableState.dealerHand.map(renderCard).join('');
+        dealerScoreElement.textContent = tableState.dealerScore;
 
-        // 2. Обновление игроков (без изменений, кроме использования score из tableState)
+        // 2. Обновление игроков
         playersContainer.innerHTML = '';
         tableState.players.forEach(player => {
             const isMe = player.id === myPlayerId;
@@ -260,14 +268,14 @@
             placeBetBtn.textContent = `Ставка: ${myPlayer.bet}`;
         }
         
-        // КЛЮЧЕВОЕ ИСПРАВЛЕНИЕ: Кнопка "Начать игру"
+        // ✅ КЛЮЧЕВОЕ ИСПРАВЛЕНИЕ: Кнопка "Начать игру"
         if (isReadyToStart) {
             startGameBtn.style.display = 'inline-block';
             
-            // Определяем, являюсь ли я первым игроком (только он может нажать)
+            // Определяем, являюсь ли я первым игроком
             const isFirstPlayer = tableState.players.length > 0 && tableState.players[0].id === myPlayerId;
             
-            // Блокируем кнопку, если я не первый игрок
+            // Блокируем кнопку, если я не первый игрок (только первый может начать)
             startGameBtn.disabled = !isFirstPlayer; 
             
             if (isFirstPlayer) {
@@ -289,10 +297,12 @@
             updateDisplay('Ход дилера...');
         } else if (tableState.state === 'RESULTS') {
             updateDisplay('Раунд завершен. Делайте новую ставку.');
+        } else if (tableState.state === 'WAITING_FOR_BETS') {
+             updateDisplay('Сделайте ставку для начала следующего раунда.');
         }
     });
     
-    // ... (остальные обработчики сокетов - game_result, return_to_lobby, error_message)
+    
     socket.on('game_result', (data) => {
         const resultType = data.winnings > 0 ? 'Выигрыш' : data.winnings < 0 ? 'Проигрыш' : 'Ничья';
         const message = `${data.message} (${resultType}: ${Math.abs(data.winnings)})`;
@@ -311,6 +321,10 @@
             placeBetBtn.disabled = false;
             placeBetBtn.textContent = 'Сделать ставку';
          }
+    });
+
+    socket.on('message_display', (message) => {
+        updateDisplay(message);
     });
 
 
@@ -348,6 +362,11 @@
         }); 
     }
     
+    quickPlayBtn.onclick = () => {
+        socket.emit('quick_play', { gameType: 'Blackjack' });
+        updateDisplay('Вы добавлены в очередь быстрой игры Блэкджек...');
+    };
+
     placeBetBtn.onclick = () => {
         const amount = parseInt(betAmountInput.value);
         if (amount >= 10 && amount <= balance) { 
@@ -382,8 +401,6 @@
             socket.emit('leave_table');
         }
     };
-    
-    // (quickPlayBtn обработчик опущен)
     
 </script>
 

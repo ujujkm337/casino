@@ -42,7 +42,9 @@
         </div>
 
         <div id="tableView" style="display: none; width: 100%; max-width: 600px; text-align: center;">
-            <h2 id="tableTitle">Стол: P1 (Покер)</h2>
+            
+            <h2 id="tableTitle" style="display: none;">Стол: P1 (Покер)</h2>
+
             <div class="player-panel" style="border-color: var(--neon-pink); margin-top: 10px;">
                 <div class="player-info">Банк: <span id="potAmount">0</span> | Общие карты:</div>
                 <div id="communityCards" class="hand-container"></div>
@@ -52,16 +54,12 @@
                 </div>
 
             <div class="controls-panel" style="width: 100%; margin-top: 15px;">
-                
                 <div class="start-controls" id="startControls" style="margin-bottom: 10px; display: none;">
                     <button class="main-button" id="startGameBtn" style="background: var(--neon-green);">Начать игру</button>
                 </div>
-                
                 <div class="game-actions" id="actionsGroup" style="display: none; flex-wrap: wrap; gap: 10px; justify-content: center; width: 100%;">
-                    
                     <button class="main-button" id="foldBtn" style="flex-grow: 1; font-size: 1em; padding: 10px 15px;">Фолд</button>
                     <button class="main-button" id="checkCallBtn" style="flex-grow: 1; font-size: 1em; padding: 10px 15px;">Чек/Колл</button>
-                    
                     <div class="raise-group" style="display: flex; gap: 5px; flex-grow: 1; min-width: 180px;">
                          <input type="number" id="raiseAmountInput" placeholder="Рейз" value="100" min="50" class="bet-input" style="width: 80px; flex-grow: 1;">
                          <button class="main-button" id="raiseBtn" style="flex-grow: 2; font-size: 1em; padding: 10px 15px;">Рейз</button>
@@ -73,6 +71,7 @@
 </div>
 
 <script>
+    // (Весь JS-код остается без изменений)
     const socket = io();
     let currentTableId = null;
     let balance = 0;
@@ -90,21 +89,15 @@
     const checkCallBtn = document.getElementById('checkCallBtn');
     const raiseBtn = document.getElementById('raiseBtn');
     const raiseAmountInput = document.getElementById('raiseAmountInput');
-    
-    // ИЗМЕНЕНО: Кнопка "Назад"
     const backBtn = document.getElementById('backBtn');
-    
     const createTableBtn = document.getElementById('createTableBtn');
     const submitTableBtn = document.getElementById('submitTableBtn');
     const maxPlayersInput = document.getElementById('maxPlayersInput');
     const minBetInput = document.getElementById('minBetInput');
     const createTableForm = document.getElementById('createTableForm');
     const quickPlayBtn = document.getElementById('quickPlayBtn');
-    
     const startGameBtn = document.getElementById('startGameBtn');
     const startControls = document.getElementById('startControls');
-    
-    // ИЗМЕНЕНО: Группа кнопок
     const actionsGroup = document.getElementById('actionsGroup');
 
 
@@ -123,7 +116,7 @@
         quickPlayBtn.disabled = false;
         quickPlayBtn.textContent = '🚀 Быстрая Игра';
         startControls.style.display = 'none';
-        actionsGroup.style.display = 'none'; // Скрываем
+        actionsGroup.style.display = 'none';
     }
 
     function showTable() {
@@ -162,7 +155,6 @@
     });
 
     function renderTableList(tables) {
-        // (Логика рендера столов)
         lobbyTables.innerHTML = '';
         tables.sort((a, b) => (a.isPrivate === b.isPrivate ? 0 : a.isPrivate ? 1 : -1));
         tables.forEach(table => {
@@ -195,7 +187,8 @@
 
     socket.on('table_joined', (data) => {
         currentTableId = data.tableId;
-        document.getElementById('tableTitle').textContent = `Стол: ${data.tableId} (${data.gameType})`;
+        // ИЗМЕНЕНО: Эта строка теперь не нужна, но мы ее оставим, т.к. h2 просто скрыт
+        document.getElementById('tableTitle').textContent = `Стол: ${data.tableId} (${data.gameType})`; 
         raiseAmountInput.value = data.minBet * 2;
         showTable();
     });
@@ -215,8 +208,6 @@
             const classList = ['player-panel'];
             if (isMe) classList.push('my-player');
             if (isMyTurn) classList.push('active-turn');
-
-            // Показываем карты: (мои) ИЛИ (все, если конец раунда)
             const showCards = isMe || (tableState.state === 'RESULTS' && !p.isFolded);
 
             const playerHtml = `
@@ -246,7 +237,6 @@
             }
         });
         
-        // Управление видимостью кнопок
         const isGameActive = tableState.state === 'PRE_FLOP' || tableState.state === 'FLOP' || tableState.state === 'TURN' || tableState.state === 'RIVER';
         
         if (tableState.state === 'READY_TO_START_POKER') {
@@ -261,12 +251,11 @@
              actionsGroup.style.display = 'none';
         }
 
-        // Обновление сообщений
         if (tableState.state === 'READY_TO_START_POKER') {
             updateDisplay('Минимум 2 игрока. Нажмите "Начать игру".');
         } else if (tableState.state === 'WAITING_FOR_PLAYERS') {
             updateDisplay('Ожидание игроков...');
-        } else if (tableState.state === 'PRE_FLOP' || tableState.state === 'FLOP' || tableState.state === 'TURN' || tableState.state === 'RIVER') {
+        } else if (isGameActive) {
              const activePlayer = tableState.players.find(p => p.id === tableState.activePlayerId);
              updateDisplay(activePlayer ? `Ход игрока: ${activePlayer.username}.` : 'Ход игрока...');
         }
@@ -274,7 +263,7 @@
     
     socket.on('return_to_lobby', (data) => {
         currentTableId = null;
-        renderTableList(data.tables);
+        if(data.tables) renderTableList(data.tables.filter(t => t.gameType === 'Poker'));
         showLobby();
         messageDisplay.textContent = 'Вы вышли из-за стола.';
     });
@@ -286,6 +275,12 @@
     });
 
     socket.on('error_message', (msg) => {
+        // ИЗМЕНЕНО: Не показываем "в разработке"
+        if (msg.includes('в разработке')) {
+             console.log('Poker action (stub): ' + msg);
+             return; // Не показываем alert
+        }
+        
         alert(`Ошибка: ${msg}`);
         foldBtn.disabled = false;
         checkCallBtn.disabled = false;
@@ -297,7 +292,6 @@
 
     // --- ОБРАБОТЧИКИ КНОПОК ---
     
-    // ИЗМЕНЕНО: Кнопка "Назад"
     backBtn.onclick = (e) => {
         e.preventDefault();
         if (currentTableId) {
@@ -360,8 +354,6 @@
             alert('Неверная сумма рейза.');
         }
     };
-    
-    // 'leaveTableBtn' УДАЛЕН
 </script>
 </body>
 </html>

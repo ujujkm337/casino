@@ -36,14 +36,15 @@
                  <input type="number" id="minBetInput" min="10" value="10">
                  <button class="main-button" id="submitTableBtn">Создать</button>
             </div>
-            
             <h2>Доступные столы:</h2>
             <div id="lobbyTables" class="table-list" style="width: 100%; max-width: 500px;">
                 </div>
         </div>
 
         <div id="tableView" style="display: none; width: 100%; max-width: 600px; text-align: center;">
-            <h2 id="tableTitle">Стол: T1 (Блэкджек)</h2>
+            
+            <h2 id="tableTitle" style="display: none;">Стол: T1 (Блэкджек)</h2>
+            
             <div class="player-panel" style="border-color: var(--neon-pink); margin-top: 10px;">
                 <div class="player-info">Дилер (<span id="dealerScore">0</span>)</div>
                 <div id="dealerHand" class="hand-container"></div>
@@ -68,6 +69,7 @@
 </div>
 
 <script>
+    // (Весь JS-код остается без изменений)
     const socket = io();
     let currentTableId = null;
     let balance = 0;
@@ -85,10 +87,7 @@
     const placeBetBtn = document.getElementById('placeBetBtn');
     const hitBtn = document.getElementById('hitBtn');
     const standBtn = document.getElementById('standBtn');
-    
-    // ИЗМЕНЕНО: Кнопка "Назад"
     const backBtn = document.getElementById('backBtn');
-    
     const createTableBtn = document.getElementById('createTableBtn');
     const submitTableBtn = document.getElementById('submitTableBtn');
     const maxPlayersInput = document.getElementById('maxPlayersInput');
@@ -96,8 +95,6 @@
     const createTableForm = document.getElementById('createTableForm');
     const startGameBtn = document.getElementById('startGameBtn');
     const quickPlayBtn = document.getElementById('quickPlayBtn');
-    
-    // ИЗМЕНЕНО: Группы кнопок
     const bettingGroup = document.getElementById('bettingGroup');
     const actionsGroup = document.getElementById('actionsGroup');
 
@@ -118,8 +115,6 @@
         standBtn.disabled = true;
         quickPlayBtn.disabled = false;
         quickPlayBtn.textContent = '🚀 Быстрая Игра';
-        
-        // Показываем/скрываем группы
         bettingGroup.style.display = 'flex';
         actionsGroup.style.display = 'none';
     }
@@ -152,7 +147,7 @@
         balance = data.balance;
         updateDisplay('Подключено! Выберите стол.');
         if (data.username) myUsername = data.username;
-        if(data.balance) balanceDisplay.textContent = `Баланс: ${data.balance}`; // Обновляем баланс
+        if(data.balance) balanceDisplay.textContent = `Баланс: ${data.balance}`;
     });
 
     socket.on('table_list', (tables) => {
@@ -160,7 +155,6 @@
     });
 
     function renderTableList(tables) {
-        // (Логика рендера столов)
         lobbyTables.innerHTML = '';
         tables.sort((a, b) => (a.isPrivate === b.isPrivate ? 0 : a.isPrivate ? 1 : -1));
         tables.forEach(table => {
@@ -197,7 +191,8 @@
 
     socket.on('table_joined', (data) => {
         currentTableId = data.tableId;
-        document.getElementById('tableTitle').textContent = `Стол: ${data.tableId} (${data.gameType})`;
+        // ИЗМЕНЕНО: Эта строка теперь не нужна, но мы ее оставим, т.к. h2 просто скрыт
+        document.getElementById('tableTitle').textContent = `Стол: ${data.tableId} (${data.gameType})`; 
         betAmountInput.value = data.minBet;
         showTable();
     });
@@ -209,7 +204,6 @@
         const isGameStarted = tableState.state !== 'WAITING_FOR_BETS' && tableState.state !== 'WAITING_FOR_PLAYERS' && tableState.state !== 'READY_TO_START';
         
         tableState.dealerHand.forEach((card, index) => {
-            // ИЗМЕНЕНО: Показываем рубашку только в ход игрока
             if (index === 0 && tableState.state === 'PLAYER_TURN') {
                 dealerHandElement.innerHTML += renderCard(null);
             } else {
@@ -220,7 +214,6 @@
         if (tableState.state === 'DEALER_TURN' || tableState.state === 'RESULTS') {
             dealerScoreElement.textContent = tableState.dealerScore;
         } else if (tableState.state === 'PLAYER_TURN' && tableState.dealerHand.length > 0) {
-             // Показываем счет второй карты дилера, если она есть
              const card = tableState.dealerHand[1];
              if(card) {
                 const rank = card.slice(0, -1);
@@ -264,7 +257,7 @@
         if (tableState.state === 'PLAYER_TURN' || tableState.state === 'DEALER_TURN') {
             bettingGroup.style.display = 'none';
             actionsGroup.style.display = 'flex';
-        } else if (tableState.state === 'WAITING_FOR_BETS' || tableState.state === 'READY_TO_START') {
+        } else if (tableState.state === 'WAITING_FOR_BETS' || tableState.state === 'READY_TO_START' || tableState.state === 'RESULTS') {
             bettingGroup.style.display = 'flex';
             actionsGroup.style.display = 'none';
         }
@@ -275,7 +268,7 @@
         
         // 5. Общее сообщение
         if (tableState.state === 'WAITING_FOR_BETS') {
-             updateDisplay(tableState.lastResult || 'Сделайте вашу ставку.'); // Показываем результат прошлого раунда
+             updateDisplay(tableState.lastResult || 'Сделайте вашу ставку.');
         } else if (tableState.state === 'READY_TO_START') {
              updateDisplay('Все ставки сделаны. Нажмите "Начать игру".');
         } else if (tableState.state === 'PLAYER_TURN') {
@@ -292,7 +285,7 @@
     
     socket.on('return_to_lobby', (data) => {
         currentTableId = null;
-        renderTableList(data.tables);
+        if(data.tables) renderTableList(data.tables.filter(t => t.gameType === 'Blackjack'));
         showLobby();
         messageDisplay.textContent = 'Вы вышли из-за стола.';
     });
@@ -305,7 +298,6 @@
 
     socket.on('error_message', (msg) => {
         alert(`Ошибка: ${msg}`);
-        // Сброс кнопок
         placeBetBtn.disabled = false;
         placeBetBtn.textContent = 'Сделать ставку';
         hitBtn.disabled = false;
@@ -317,15 +309,14 @@
 
     // --- ОБРАБОТЧИКИ КНОПОК ---
 
-    // ИЗМЕНЕНО: Кнопка "Назад"
     backBtn.onclick = (e) => {
-        e.preventDefault(); // Отменяем переход по ссылке
+        e.preventDefault(); 
         if (currentTableId) {
             if (confirm("Вы уверены, что хотите покинуть стол?")) {
                 socket.emit('leave_table');
             }
         } else {
-            window.location.href = 'index.html'; // Если не за столом, уходим
+            window.location.href = 'index.html';
         }
     };
 
@@ -392,8 +383,6 @@
         standBtn.disabled = true;
         socket.emit('stand', { tableId: currentTableId }); 
     };
-    
-    // 'leaveTableBtn' УДАЛЕН
 </script>
 
 </body>

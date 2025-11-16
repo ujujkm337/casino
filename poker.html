@@ -11,7 +11,7 @@
 
 <div class="casino-wrapper" id="casinoWrapper">
     <div class="game-container">
-        <a href="index.html" class="main-button" style="width: auto; padding: 5px 10px; font-size: 1em; align-self: flex-start; background: #555;">← Назад</a>
+        <a href="index.html" id="backBtn" class="main-button" style="width: auto; padding: 5px 10px; font-size: 1em; align-self: flex-start; background: #555;">← Назад</a>
         
         <h1 style="color:var(--neon-blue); text-shadow: var(--shadow-blue);">♠️ ОНЛАЙН ПОКЕР</h1>
         
@@ -43,9 +43,7 @@
 
         <div id="tableView" style="display: none; width: 100%; max-width: 600px; text-align: center;">
             <h2 id="tableTitle">Стол: P1 (Покер)</h2>
-            <button class="main-button" id="leaveTableBtn" style="background: var(--neon-red);">Покинуть стол</button>
-
-            <div class="player-panel" style="border-color: var(--neon-pink); margin-top: 15px;">
+            <div class="player-panel" style="border-color: var(--neon-pink); margin-top: 10px;">
                 <div class="player-info">Банк: <span id="potAmount">0</span> | Общие карты:</div>
                 <div id="communityCards" class="hand-container"></div>
             </div>
@@ -59,7 +57,7 @@
                     <button class="main-button" id="startGameBtn" style="background: var(--neon-green);">Начать игру</button>
                 </div>
                 
-                <div class="game-actions" style="display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; width: 100%;">
+                <div class="game-actions" id="actionsGroup" style="display: none; flex-wrap: wrap; gap: 10px; justify-content: center; width: 100%;">
                     
                     <button class="main-button" id="foldBtn" style="flex-grow: 1; font-size: 1em; padding: 10px 15px;">Фолд</button>
                     <button class="main-button" id="checkCallBtn" style="flex-grow: 1; font-size: 1em; padding: 10px 15px;">Чек/Колл</button>
@@ -92,7 +90,10 @@
     const checkCallBtn = document.getElementById('checkCallBtn');
     const raiseBtn = document.getElementById('raiseBtn');
     const raiseAmountInput = document.getElementById('raiseAmountInput');
-    const leaveTableBtn = document.getElementById('leaveTableBtn');
+    
+    // ИЗМЕНЕНО: Кнопка "Назад"
+    const backBtn = document.getElementById('backBtn');
+    
     const createTableBtn = document.getElementById('createTableBtn');
     const submitTableBtn = document.getElementById('submitTableBtn');
     const maxPlayersInput = document.getElementById('maxPlayersInput');
@@ -100,9 +101,11 @@
     const createTableForm = document.getElementById('createTableForm');
     const quickPlayBtn = document.getElementById('quickPlayBtn');
     
-    // НОВЫЕ ЭЛЕМЕНТЫ
     const startGameBtn = document.getElementById('startGameBtn');
     const startControls = document.getElementById('startControls');
+    
+    // ИЗМЕНЕНО: Группа кнопок
+    const actionsGroup = document.getElementById('actionsGroup');
 
 
     // --- УТИЛИТЫ КЛИЕНТА ---
@@ -119,7 +122,8 @@
         raiseBtn.disabled = true;
         quickPlayBtn.disabled = false;
         quickPlayBtn.textContent = '🚀 Быстрая Игра';
-        startControls.style.display = 'none'; // Скрываем кнопку старта
+        startControls.style.display = 'none';
+        actionsGroup.style.display = 'none'; // Скрываем
     }
 
     function showTable() {
@@ -150,6 +154,7 @@
         balance = data.balance;
         updateDisplay('Подключено! Выберите стол.');
         if (data.username) myUsername = data.username;
+        if(data.balance) balanceDisplay.textContent = `Баланс: ${data.balance}`;
     });
 
     socket.on('table_list', (tables) => {
@@ -157,16 +162,14 @@
     });
 
     function renderTableList(tables) {
+        // (Логика рендера столов)
         lobbyTables.innerHTML = '';
         tables.sort((a, b) => (a.isPrivate === b.isPrivate ? 0 : a.isPrivate ? 1 : -1));
-
         tables.forEach(table => {
             const playersCount = parseInt(table.currentPlayers) || 0; 
             const maxPlayers = parseInt(table.maxPlayers) || 0;
             const neededPlayers = Math.max(0, maxPlayers - playersCount); 
-
             let tableStatus;
-            // НОВОЕ СОСТОЯНИЕ
             if (table.state === 'READY_TO_START_POKER') {
                 tableStatus = 'Готов к старту';
             } else if (table.state === 'PRE_FLOP' || table.state === 'FLOP' || table.state === 'TURN' || table.state === 'RIVER' || table.state === 'RESULTS') {
@@ -178,10 +181,8 @@
             } else {
                 tableStatus = `Ожидание (нужно ${neededPlayers} игрока)`;
             }
-
             const icon = '♠️';
             const lock = table.isPrivate ? ' 🔒' : '';
-
             const html = `
                 <div class="table-item" onclick="joinTable('${table.id}', ${table.isPrivate})">
                     ${icon} Стол: ${table.id}${lock} (${playersCount}/${maxPlayers})
@@ -197,7 +198,6 @@
         document.getElementById('tableTitle').textContent = `Стол: ${data.tableId} (${data.gameType})`;
         raiseAmountInput.value = data.minBet * 2;
         showTable();
-        // updateDisplay('Вы присоединились к столу. Ожидание игроков.'); // Убрано
     });
 
     socket.on('table_state', (tableState) => {
@@ -206,7 +206,7 @@
         const communityCardsElement = document.getElementById('communityCards');
         communityCardsElement.innerHTML = tableState.communityCards 
             ? tableState.communityCards.map(card => renderCard(card)).join('')
-            : 'Ожидание раздачи...';
+            : '...';
 
         playersContainer.innerHTML = '';
         tableState.players.forEach(p => {
@@ -216,11 +216,14 @@
             if (isMe) classList.push('my-player');
             if (isMyTurn) classList.push('active-turn');
 
+            // Показываем карты: (мои) ИЛИ (все, если конец раунда)
+            const showCards = isMe || (tableState.state === 'RESULTS' && !p.isFolded);
+
             const playerHtml = `
                 <div id="player-${p.id}" class="${classList.join(' ')}" style="border-color: ${isMe ? 'var(--neon-green)' : 'var(--neon-text)'};">
                     <div class="player-info">${p.username} ${isMe ? '(Вы)' : ''} | Статус: ${p.isFolded ? 'ФОЛД' : (isMyTurn ? 'Ход' : 'Ожидание')} | Ставка: ${p.totalBet || 0}</div>
                     <div class="hand-container">
-                        ${isMe || tableState.state === 'RESULTS' 
+                        ${showCards
                             ? p.hand.map(card => renderCard(card)).join('') 
                             : p.hand.map(() => renderCard(null)).join('')
                         }
@@ -235,7 +238,7 @@
                  raiseBtn.disabled = !isMyTurn || p.isFolded;
                  
                  const callAmount = (tableState.currentBet || 0) - (p.currentBet || 0);
-                 if (callAmount === 0) {
+                 if (callAmount <= 0) {
                      checkCallBtn.textContent = 'Чек';
                  } else {
                      checkCallBtn.textContent = `Колл (${callAmount})`;
@@ -243,13 +246,19 @@
             }
         });
         
-        // НОВОЕ: Управление кнопкой старта
-        const canStartPoker = tableState.state === 'READY_TO_START_POKER';
-        if (canStartPoker) {
+        // Управление видимостью кнопок
+        const isGameActive = tableState.state === 'PRE_FLOP' || tableState.state === 'FLOP' || tableState.state === 'TURN' || tableState.state === 'RIVER';
+        
+        if (tableState.state === 'READY_TO_START_POKER') {
             startControls.style.display = 'block';
+            actionsGroup.style.display = 'none';
             startGameBtn.disabled = false;
-        } else {
+        } else if (isGameActive) {
             startControls.style.display = 'none';
+            actionsGroup.style.display = 'flex';
+        } else {
+             startControls.style.display = 'none';
+             actionsGroup.style.display = 'none';
         }
 
         // Обновление сообщений
@@ -257,11 +266,9 @@
             updateDisplay('Минимум 2 игрока. Нажмите "Начать игру".');
         } else if (tableState.state === 'WAITING_FOR_PLAYERS') {
             updateDisplay('Ожидание игроков...');
-        } else if (tableState.state === 'PRE_FLOP') {
-             updateDisplay('Игра началась. PRE-FLOP.');
-        } else if (tableState.state === 'PLAYER_TURN') {
+        } else if (tableState.state === 'PRE_FLOP' || tableState.state === 'FLOP' || tableState.state === 'TURN' || tableState.state === 'RIVER') {
              const activePlayer = tableState.players.find(p => p.id === tableState.activePlayerId);
-             updateDisplay(`Ход игрока: ${activePlayer ? activePlayer.username : ''}.`);
+             updateDisplay(activePlayer ? `Ход игрока: ${activePlayer.username}.` : 'Ход игрока...');
         }
     });
     
@@ -289,6 +296,18 @@
     });
 
     // --- ОБРАБОТЧИКИ КНОПОК ---
+    
+    // ИЗМЕНЕНО: Кнопка "Назад"
+    backBtn.onclick = (e) => {
+        e.preventDefault();
+        if (currentTableId) {
+            if (confirm("Вы уверены, что хотите покинуть стол?")) {
+                socket.emit('leave_table');
+            }
+        } else {
+            window.location.href = 'index.html';
+        }
+    };
     
     quickPlayBtn.onclick = () => {
         quickPlayBtn.disabled = true;
@@ -326,7 +345,6 @@
         }); 
     }
     
-    // НОВОЕ: Кнопка старта Покера
     startGameBtn.onclick = () => {
         startGameBtn.disabled = true;
         socket.emit('start_game_command', { tableId: currentTableId });
@@ -343,11 +361,7 @@
         }
     };
     
-    leaveTableBtn.onclick = () => { 
-        if (confirm("Вы уверены, что хотите покинуть стол?")) { 
-            socket.emit('leave_table'); 
-        } 
-    };
+    // 'leaveTableBtn' УДАЛЕН
 </script>
 </body>
 </html>

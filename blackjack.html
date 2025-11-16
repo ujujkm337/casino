@@ -11,7 +11,7 @@
 
 <div class="casino-wrapper" id="casinoWrapper">
     <div class="game-container">
-        <a href="index.html" class="main-button" style="width: auto; padding: 5px 10px; font-size: 1em; align-self: flex-start; background: #555;">← Назад</a>
+        <a href="index.html" id="backBtn" class="main-button" style="width: auto; padding: 5px 10px; font-size: 1em; align-self: flex-start; background: #555;">← Назад</a>
         
         <h1 style="color:var(--neon-blue); text-shadow: var(--shadow-blue);">🃏 ОНЛАЙN БЛЭКДЖЕК</h1>
         
@@ -44,9 +44,7 @@
 
         <div id="tableView" style="display: none; width: 100%; max-width: 600px; text-align: center;">
             <h2 id="tableTitle">Стол: T1 (Блэкджек)</h2>
-            <button class="main-button" id="leaveTableBtn" style="background: var(--neon-red);">Покинуть стол</button>
-
-            <div class="player-panel" style="border-color: var(--neon-pink);">
+            <div class="player-panel" style="border-color: var(--neon-pink); margin-top: 10px;">
                 <div class="player-info">Дилер (<span id="dealerScore">0</span>)</div>
                 <div id="dealerHand" class="hand-container"></div>
             </div>
@@ -55,12 +53,12 @@
                 </div>
 
             <div class="controls-panel" style="width: 100%; margin-top: 15px;">
-                <div class="bet-controls" id="betControls" style="display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; width: 100%;">
+                <div class="bet-controls" id="bettingGroup" style="display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; width: 100%;">
                     <input type="number" id="betAmountInput" placeholder="Ставка" value="10" min="10" class="bet-input" style="width: 100px; flex-shrink: 0;">
                     <button class="main-button" id="placeBetBtn" style="flex-grow: 1;">Сделать ставку</button>
                     <button class="main-button" id="startGameBtn" style="background: var(--neon-green); display: none; flex-grow: 1;">Начать игру</button>
                 </div>
-                <div class="game-actions" id="gameActions" style="display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; width: 100%; margin-top: 10px;">
+                <div class="game-actions" id="actionsGroup" style="display: none; flex-wrap: wrap; gap: 10px; justify-content: center; width: 100%; margin-top: 10px;">
                     <button class="main-button" id="hitBtn" disabled style="flex-grow: 1; font-size: 1em; padding: 10px 15px;">Взять еще (Hit)</button>
                     <button class="main-button" id="standBtn" disabled style="flex-grow: 1; font-size: 1em; padding: 10px 15px;">Хватит (Stand)</button>
                 </div>
@@ -70,7 +68,6 @@
 </div>
 
 <script>
-    // (JS-код Блэкджека остается таким же, как в предыдущем ответе)
     const socket = io();
     let currentTableId = null;
     let balance = 0;
@@ -88,7 +85,10 @@
     const placeBetBtn = document.getElementById('placeBetBtn');
     const hitBtn = document.getElementById('hitBtn');
     const standBtn = document.getElementById('standBtn');
-    const leaveTableBtn = document.getElementById('leaveTableBtn');
+    
+    // ИЗМЕНЕНО: Кнопка "Назад"
+    const backBtn = document.getElementById('backBtn');
+    
     const createTableBtn = document.getElementById('createTableBtn');
     const submitTableBtn = document.getElementById('submitTableBtn');
     const maxPlayersInput = document.getElementById('maxPlayersInput');
@@ -96,6 +96,10 @@
     const createTableForm = document.getElementById('createTableForm');
     const startGameBtn = document.getElementById('startGameBtn');
     const quickPlayBtn = document.getElementById('quickPlayBtn');
+    
+    // ИЗМЕНЕНО: Группы кнопок
+    const bettingGroup = document.getElementById('bettingGroup');
+    const actionsGroup = document.getElementById('actionsGroup');
 
 
     // --- УТИЛИТЫ КЛИЕНТА ---
@@ -114,6 +118,10 @@
         standBtn.disabled = true;
         quickPlayBtn.disabled = false;
         quickPlayBtn.textContent = '🚀 Быстрая Игра';
+        
+        // Показываем/скрываем группы
+        bettingGroup.style.display = 'flex';
+        actionsGroup.style.display = 'none';
     }
 
     function showTable() {
@@ -144,6 +152,7 @@
         balance = data.balance;
         updateDisplay('Подключено! Выберите стол.');
         if (data.username) myUsername = data.username;
+        if(data.balance) balanceDisplay.textContent = `Баланс: ${data.balance}`; // Обновляем баланс
     });
 
     socket.on('table_list', (tables) => {
@@ -151,18 +160,18 @@
     });
 
     function renderTableList(tables) {
+        // (Логика рендера столов)
         lobbyTables.innerHTML = '';
         tables.sort((a, b) => (a.isPrivate === b.isPrivate ? 0 : a.isPrivate ? 1 : -1));
-
         tables.forEach(table => {
             const playersCount = parseInt(table.currentPlayers) || 0; 
             const maxPlayers = parseInt(table.maxPlayers) || 0;
             const neededPlayers = Math.max(0, maxPlayers - playersCount); 
-
             let tableStatus;
-            if (table.state === 'PLAYER_TURN' || table.state === 'DEALER_TURN' || table.state === 'RESULTS') {
+            if (table.state === 'PLAYER_TURN' || table.state === 'DEALER_TURN') {
                 tableStatus = 'Игра идет';
-                if (playersCount === maxPlayers) tableStatus = 'Игра идет (Полный)';
+            } else if (table.state === 'RESULTS') {
+                tableStatus = 'Подсчет...';
             } else if (table.state === 'READY_TO_START') {
                 tableStatus = 'Готов к старту';
             } else if (table.state === 'WAITING_FOR_BETS') {
@@ -174,10 +183,8 @@
             } else {
                 tableStatus = `Ожидание (нужно ${neededPlayers} игрока)`;
             }
-
             const icon = '🃏';
             const lock = table.isPrivate ? ' 🔒' : '';
-
             const html = `
                 <div class="table-item" onclick="joinTable('${table.id}', ${table.isPrivate})">
                     ${icon} Стол: ${table.id}${lock} (${playersCount}/${maxPlayers})
@@ -193,7 +200,6 @@
         document.getElementById('tableTitle').textContent = `Стол: ${data.tableId} (${data.gameType})`;
         betAmountInput.value = data.minBet;
         showTable();
-        // updateDisplay('Вы присоединились к столу. Сделайте ставку.'); // Убрано, т.к. table_state придет
     });
 
     socket.on('table_state', (tableState) => {
@@ -201,8 +207,10 @@
         const dealerHandElement = document.getElementById('dealerHand');
         dealerHandElement.innerHTML = '';
         const isGameStarted = tableState.state !== 'WAITING_FOR_BETS' && tableState.state !== 'WAITING_FOR_PLAYERS' && tableState.state !== 'READY_TO_START';
+        
         tableState.dealerHand.forEach((card, index) => {
-            if (isGameStarted && index === 0 && tableState.state === 'PLAYER_TURN') {
+            // ИЗМЕНЕНО: Показываем рубашку только в ход игрока
+            if (index === 0 && tableState.state === 'PLAYER_TURN') {
                 dealerHandElement.innerHTML += renderCard(null);
             } else {
                 dealerHandElement.innerHTML += renderCard(card);
@@ -211,6 +219,17 @@
         const dealerScoreElement = document.getElementById('dealerScore');
         if (tableState.state === 'DEALER_TURN' || tableState.state === 'RESULTS') {
             dealerScoreElement.textContent = tableState.dealerScore;
+        } else if (tableState.state === 'PLAYER_TURN' && tableState.dealerHand.length > 0) {
+             // Показываем счет второй карты дилера, если она есть
+             const card = tableState.dealerHand[1];
+             if(card) {
+                const rank = card.slice(0, -1);
+                if (rank === 'A') dealerScoreElement.textContent = '11';
+                else if (['K', 'Q', 'J', 'T'].includes(rank)) dealerScoreElement.textContent = '10';
+                else dealerScoreElement.textContent = parseInt(rank);
+             } else {
+                dealerScoreElement.textContent = '?';
+             }
         } else {
             dealerScoreElement.textContent = '?';
         }
@@ -226,7 +245,7 @@
 
             const playerHtml = `
                 <div id="player-${p.id}" class="${classList.join(' ')}" style="border-color: ${isMe ? 'var(--neon-green)' : 'var(--neon-text)'};">
-                    <div class="player-info">${p.username} ${isMe ? '(Вы)' : ''} | Счет: <span id="score-${p.id}">${(p.active && isGameStarted) ? p.score : '?'}</span> | Ставка: ${p.bet}</div>
+                    <div class="player-info">${p.username} ${isMe ? '(Вы)' : ''} | Счет: <span id="score-${p.id}">${p.score}</span> | Ставка: ${p.bet}</div>
                     <div class="hand-container">${p.hand.map(card => renderCard(card)).join('')}</div>
                 </div>
             `;
@@ -241,24 +260,31 @@
             }
         });
         
-        // 3. Кнопка "Начать игру"
-        const showStartButton = tableState.state === 'READY_TO_START';
-        startGameBtn.style.display = (tableState.state === 'WAITING_FOR_BETS' || tableState.state === 'READY_TO_START') ? 'inline-block' : 'none';
-        startGameBtn.disabled = !showStartButton;
-        startGameBtn.textContent = showStartButton ? 'Начать игру' : 'Ожидание ставок...';
+        // 3. Управление видимостью кнопок
+        if (tableState.state === 'PLAYER_TURN' || tableState.state === 'DEALER_TURN') {
+            bettingGroup.style.display = 'none';
+            actionsGroup.style.display = 'flex';
+        } else if (tableState.state === 'WAITING_FOR_BETS' || tableState.state === 'READY_TO_START') {
+            bettingGroup.style.display = 'flex';
+            actionsGroup.style.display = 'none';
+        }
         
-        // 4. Общее сообщение
+        // 4. Кнопка "Начать игру"
+        const showStartButton = tableState.state === 'READY_TO_START';
+        startGameBtn.style.display = showStartButton ? 'inline-block' : 'none';
+        
+        // 5. Общее сообщение
         if (tableState.state === 'WAITING_FOR_BETS') {
-             updateDisplay('Сделайте вашу ставку.');
+             updateDisplay(tableState.lastResult || 'Сделайте вашу ставку.'); // Показываем результат прошлого раунда
         } else if (tableState.state === 'READY_TO_START') {
              updateDisplay('Все ставки сделаны. Нажмите "Начать игру".');
         } else if (tableState.state === 'PLAYER_TURN') {
              const activePlayer = tableState.players.find(p => p.id === tableState.activePlayerId);
-             updateDisplay(`Ход игрока: ${activePlayer.username}.`);
+             updateDisplay(activePlayer ? `Ход игрока: ${activePlayer.username}.` : 'Ход игрока...');
         } else if (tableState.state === 'DEALER_TURN') {
              updateDisplay('Ход Дилера...');
         } else if (tableState.state === 'RESULTS') {
-             updateDisplay('Раунд завершен. Ожидание нового раунда.');
+             updateDisplay(tableState.lastResult || 'Раунд завершен. Ожидание...');
         } else if (tableState.state === 'WAITING_FOR_PLAYERS') {
              updateDisplay('Ожидание игроков...');
         }
@@ -279,6 +305,7 @@
 
     socket.on('error_message', (msg) => {
         alert(`Ошибка: ${msg}`);
+        // Сброс кнопок
         placeBetBtn.disabled = false;
         placeBetBtn.textContent = 'Сделать ставку';
         hitBtn.disabled = false;
@@ -289,6 +316,18 @@
     });
 
     // --- ОБРАБОТЧИКИ КНОПОК ---
+
+    // ИЗМЕНЕНО: Кнопка "Назад"
+    backBtn.onclick = (e) => {
+        e.preventDefault(); // Отменяем переход по ссылке
+        if (currentTableId) {
+            if (confirm("Вы уверены, что хотите покинуть стол?")) {
+                socket.emit('leave_table');
+            }
+        } else {
+            window.location.href = 'index.html'; // Если не за столом, уходим
+        }
+    };
 
     quickPlayBtn.onclick = () => {
         quickPlayBtn.disabled = true;
@@ -354,11 +393,7 @@
         socket.emit('stand', { tableId: currentTableId }); 
     };
     
-    leaveTableBtn.onclick = () => { 
-        if (confirm("Вы уверены, что хотите покинуть стол?")) { 
-            socket.emit('leave_table'); 
-        } 
-    };
+    // 'leaveTableBtn' УДАЛЕН
 </script>
 
 </body>

@@ -94,24 +94,22 @@ body {
     font-weight: 800; 
     border: none; 
     border-radius: 5px; 
-    cursor: pointer;
+    cursor: pointer; 
     background: var(--neon-pink); 
     color: var(--neon-bg); 
     box-shadow: var(--shadow-pink); 
     transition: all 0.2s ease; 
     text-transform: uppercase; 
-    width: 100%; 
-    box-sizing: border-box; 
+    width: 100%;
+    box-sizing: border-box;
 }
-
 .main-button:hover:not(:disabled) { 
     transform: scale(1.02); 
     box-shadow: 0 0 25px var(--neon-pink); 
 }
-
 .main-button:disabled { 
     background: #444; 
-    color: #888; 
+    color: #888;
     box-shadow: none; 
     cursor: not-allowed; 
     opacity: 0.6; 
@@ -124,7 +122,6 @@ body {
     gap: 15px;
     width: 100%;
 }
-
 .game-item {
     text-decoration: none;
     color: var(--neon-text);
@@ -135,71 +132,16 @@ body {
     font-size: 1em;
     font-weight: bold;
     box-shadow: var(--shadow-blue);
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    transition: transform 0.2s, box-shadow 0.2s;
+    border: 2px solid var(--neon-blue);
 }
-
 .game-item:hover {
     transform: scale(1.05);
     box-shadow: 0 0 20px var(--neon-blue);
 }
+.game-item span { display: block; font-size: 2.5em; margin-bottom: 5px; }
 
-.table-list {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-}
-
-.table-item {
-    padding: 10px;
-    border: 1px solid var(--neon-blue);
-    border-radius: 5px;
-    background: rgba(0, 0, 0, 0.4);
-    cursor: pointer;
-    transition: background 0.2s ease;
-    font-size: 0.9em;
-    text-align: center;
-}
-
-.table-item:hover {
-    background: rgba(0, 0, 0, 0.6);
-}
-
-/* --- СТИЛИ ДЛЯ ИГРОВОГО СТОЛА --- */
-.player-panel {
-    border: 1px solid var(--neon-metal);
-    border-radius: 8px;
-    padding: 10px;
-    margin-bottom: 10px;
-    background: rgba(0, 0, 0, 0.2);
-    transition: box-shadow 0.3s ease, border-color 0.3s ease;
-}
-
-.player-info {
-    font-size: 1em;
-    font-weight: 700;
-    margin-bottom: 5px;
-    color: var(--neon-text);
-}
-
-.controls-panel {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    width: 100%;
-    margin-top: 20px;
-    padding-top: 10px;
-    border-top: 1px dashed var(--neon-metal);
-}
-
-.bet-controls, .game-actions {
-    display: flex;
-    gap: 10px;
-    width: 100%;
-    max-width: 450px;
-    justify-content: center;
-}
-
-/* --- СТИЛИ ДЛЯ КАРТ --- */
+/* --- СТИЛИ ДЛЯ БЛЭКДЖЕКА/ПОКЕРА --- */
 .hand-container { 
     text-align: center; 
     min-height: 75px; 
@@ -231,35 +173,28 @@ body {
     font-weight: 700;
     color: #1e272e;
     padding: 2px 0;
+    box-sizing: border-box;
 }
-.card-suit-red { color: #d63031; }
-.card-suit-black { color: #1e272e; }
-.card-back {
-    background-color: var(--neon-red);
-    color: var(--neon-text);
-    border: 2px solid var(--neon-text);
-    box-shadow: 0 0 10px var(--neon-red);
-    font-size: 1.5em;
-    padding: 0;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    text-shadow: var(--shadow-red);
+.red-suit { color: var(--neon-red); }
+.card-suit-symbol { font-size: 1.3em; line-height: 1; }
+.card-back { 
+    background-color: var(--neon-metal); 
+    border: 3px solid var(--neon-pink); 
+    color: var(--neon-pink); 
+    font-size: 1.5em; 
+    display: flex; 
+    justify-content: center; 
+    align-items: center; 
 }
 
-/* Формы */
-.form-panel {
-    padding: 15px;
-    background: var(--neon-metal);
+/* Стили для лобби (Список комнат) */
+.table-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px;
     border: 1px solid var(--neon-blue);
     border-radius: 8px;
-    width: 100%;
-    max-width: 350px;
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    align-items: center;
+    background: rgba(0, 255, 255, 0.1);
 }
-.form-panel input {
-    width: 80%;
-}
+.table-item span { font-weight: bold; }

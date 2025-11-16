@@ -1,9 +1,8 @@
-// server.js (Полный код с изменениями)
+// server.js (Полный код с ИЗМЕНЕНИЯМИ)
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 const path = require('path');
-// Подключаем НОВУЮ, ИСПРАВЛЕННУЮ логику
 const { GameServerLogic } = require('./GameServerLogic'); 
 
 const app = express();
@@ -11,29 +10,23 @@ const server = http.createServer(app);
 const io = new Server(server);
 const port = process.env.PORT || 3000;
 
-// Обслуживаем статические файлы из КОРНЕВОЙ директории
 app.use(express.static(__dirname)); 
 
-// Явный маршрут для главной страницы
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-// Инициализация серверной логики игры
 const gameServer = new GameServerLogic(io);
 
-// Обработка подключений Socket.io
 io.on('connection', (socket) => {
     console.log(`User connected: ${socket.id}`);
     
-    // Авторизация
     socket.on('auth_request', () => {
         gameServer.handleAuth(socket);
     });
 
-    // Действия в лобби
     socket.on('join_table', (data) => {
-        gameServer.joinTable(socket, data.tableId, data.wantsBots);
+        gameServer.joinTable(socket, data.tableId, data.wantsBots, data.password);
     });
     
     socket.on('leave_table', () => {
@@ -44,12 +37,16 @@ io.on('connection', (socket) => {
         gameServer.createTable(socket, data);
     });
     
+    socket.on('quick_play', (data) => {
+        gameServer.handleQuickPlay(socket, data.gameType);
+    });
+
     // Блэкджек действия
     socket.on('place_bet', (data) => {
         gameServer.placeBet(socket, data.tableId, data.amount);
     });
     
-    // НОВОЕ: Обработчик для явного запуска игры
+    // (Используется и Блэкджеком, и Покером)
     socket.on('start_game_command', (data) => {
         gameServer.startGameCommand(socket, data.tableId);
     });
@@ -61,19 +58,28 @@ io.on('connection', (socket) => {
     socket.on('stand', (data) => {
         gameServer.stand(socket, data.tableId);
     });
+    
+    // НОВОЕ: Покер действия (вызов заглушек)
+    socket.on('fold', () => {
+        gameServer.fold(socket);
+    });
+    
+    socket.on('call_check', () => {
+        gameServer.callCheck(socket);
+    });
 
-    // Действия Покера (для полноты)
-    socket.on('fold', (data) => { /* gameServer.fold(socket, data.tableId); */ });
-    socket.on('call_check', (data) => { /* gameServer.callCheck(socket, data.tableId); */ });
-    socket.on('raise', (data) => { /* gameServer.raise(socket, data.tableId, data.amount); */ });
+    socket.on('raise', (data) => {
+        gameServer.raise(socket, data.amount);
+    });
 
-    // Обработчик отключения
+
+    // Обработка отключения
     socket.on('disconnect', () => {
-        gameServer.handleDisconnect(socket);
         console.log(`User disconnected: ${socket.id}`);
+        gameServer.handleDisconnect(socket);
     });
 });
 
 server.listen(port, () => {
-    console.log(`Server listening on port ${port}`);
+    console.log(`Server running at http://localhost:${port}`);
 });

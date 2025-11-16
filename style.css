@@ -1,4 +1,4 @@
-/* public/style.css (НОВЫЙ НЕОНОВЫЙ СТИЛЬ) */
+/* public/style.css */
 
 @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap');
 
@@ -190,11 +190,13 @@ body {
 /* Стили для лобби (Список комнат) */
 .table-item {
     display: flex;
-    justify-content: space-between;
-    align-items: center;
+    flex-direction: column;
+    justify-content: center;
+    align-items: flex-start;
     padding: 10px;
     border: 1px solid var(--neon-blue);
     border-radius: 8px;
     background: rgba(0, 255, 255, 0.1);
+    cursor: pointer;
 }
-.table-item span { font-weight: bold; }
+.table-item strong { font-weight: 700; }
